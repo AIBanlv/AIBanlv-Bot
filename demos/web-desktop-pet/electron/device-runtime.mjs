@@ -7,9 +7,9 @@ import { loadDefaultProfile } from './device-default-profile.mjs'
 
 export class DeviceRuntime extends EventEmitter {
   constructor({ channel, files, directory, download = downloadAvatar, save = writeFile,
-    remove = file => rm(file, { force: true }), defaultProfile = loadDefaultProfile, renderMs = 45000, assetCache }) {
+    remove = file => rm(file, { force: true }), defaultProfile = loadDefaultProfile, defaultAvatar = loadDefaultProfile, renderMs = 45000, assetCache }) {
     super()
-    Object.assign(this, { channel, files, directory, download, save, remove, defaultProfile, renderMs, assetCache })
+    Object.assign(this, { channel, files, directory, download, save, remove, defaultProfile, defaultAvatar, renderMs, assetCache })
     this.cache = new Map()
     this.state = { current: null, desired: null, roles: [], renderId: '', renderAsset: '',
       phase: 'idle', progress: null, error: '' }
@@ -142,35 +142,49 @@ export class DeviceRuntime extends EventEmitter {
       const roles = [...this.state.roles.filter(item => item.agentId !== profile.agentId), profile].slice(-12)
       this.publish({ current: profile, desired: profile, roles, phase: 'ready', progress: null, error: '',
         renderAsset: this.currentAsset || '', renderId: this.currentRenderId || '' })
+      if (!this.currentAsset) this.track((async () => {
+        try {
+          const avatar = await this.defaultAvatar(signal)
+          if (sequence !== this.sequence || signal.aborted || !avatar?.publicAvatar || !avatar.zipUrl) return
+          await this.loadAvatar(profile, avatar, signal, sequence)
+        } catch (error) {
+          if (!signal.aborted) this.emit('diagnostic', { agentId: profile.agentId, stage: 'default-avatar', code: error.code || error.name })
+        }
+      })())
       return
     }
     this.publish({ desired: profile, phase: 'downloading', progress: 0, error: '',
       renderAsset: this.currentAsset || '', renderId: this.currentRenderId || '' })
     // The control protocol has no loading status; application is not confirmed yet.
     this.report(profile, 'unknown')
+    await this.loadAvatar(profile, profile, signal, sequence)
+  }
+
+  async loadAvatar(profile, avatar, signal, sequence) {
+    const optional = profile.source === 'local' && !profile.zipUrl
     let asset, file, stage = 'download'
     try {
-      if (!profile.zipUrl) throw new Error('missing asset')
-      const local = profile.source === 'local'
-      const scope = profile.publicAvatar ? 'public-avatars' : JSON.stringify([this.channel.tenantId || '', this.channel.state.owner || '', this.channel.state.guest === true])
+      if (!avatar.zipUrl) throw new Error('missing asset')
+      const local = avatar.source === 'local'
+      const scope = avatar.publicAvatar ? 'public-avatars' : JSON.stringify([this.channel.tenantId || '', this.channel.state.owner || '', this.channel.state.guest === true])
       // Local imports live in LocalWorkspace. The online cache deliberately rejects
       // local: URLs, so do not pass them through its HTTPS allowlist or disk index.
-      let data = this.cache.get(profile.zipUrl)
-      if (!data && !local && this.assetCache) data = await this.assetCache.get(profile.zipUrl, scope, signal)
+      let data = this.cache.get(avatar.zipUrl)
+      if (!data && !local && this.assetCache) data = await this.assetCache.get(avatar.zipUrl, scope, signal)
       const cached = Boolean(data)
-      data ||= await this.download(profile.zipUrl, { signal, progress: progress => {
-        if (sequence === this.sequence) this.publish({ progress })
+      data ||= await this.download(avatar.zipUrl, { signal, progress: progress => {
+        if (!optional && sequence === this.sequence) this.publish({ progress })
       }, onRetry: ({ attempt }) => {
-        if (sequence === this.sequence) this.publish({ error: `形象资源连接不稳定，正在重试（${attempt}/3）…` })
+        if (!optional && sequence === this.sequence) this.publish({ error: `形象资源连接不稳定，正在重试（${attempt}/3）…` })
       } })
       if (sequence !== this.sequence || signal.aborted || !this.accessible()) return
-      if (!cached && !local && this.assetCache) await this.assetCache.put(profile.zipUrl, scope, data, signal).catch(error => {
+      if (!cached && !local && this.assetCache) await this.assetCache.put(avatar.zipUrl, scope, data, signal).catch(error => {
         signal.throwIfAborted()
         this.emit('diagnostic', { agentId: profile.agentId, stage: 'cache', code: error.code || 'CACHE_WRITE' })
       })
       if (sequence !== this.sequence || signal.aborted || !this.accessible()) return
-      this.cache.delete(profile.zipUrl)
-      this.cache.set(profile.zipUrl, data)
+      this.cache.delete(avatar.zipUrl)
+      this.cache.set(avatar.zipUrl, data)
       while (this.cache.size > 2 || [...this.cache.values()].reduce((sum, value) => sum + value.length, 0) > 64 * 1024 * 1024) {
         this.cache.delete(this.cache.keys().next().value)
       }
@@ -184,14 +198,14 @@ export class DeviceRuntime extends EventEmitter {
         await this.remove(file); this.owned.delete(file); return
       }
       this.files.set(asset, file)
-      this.pending = { profile, asset }
+      this.pending = { profile, asset, avatar }
       stage = 'render'
       this.renderTimer = setTimeout(() => {
         if (this.pending?.asset !== asset) return
         this.dropPending()
         this.fail(profile, '形象画面加载超时，请重试形象；无需刷新绑定连接')
       }, this.renderMs)
-      this.publish({ phase: 'rendering', progress: 100, renderId: id, renderAsset: asset, error: '' })
+      this.publish({ phase: optional ? 'ready' : 'rendering', progress: optional ? null : 100, renderId: id, renderAsset: asset, error: '' })
     } catch (error) {
       if (file) {
         await this.remove(file).then(() => this.owned.delete(file)).catch(() => {})
@@ -215,12 +229,12 @@ export class DeviceRuntime extends EventEmitter {
     if (id !== this.state.renderId || !this.accessible()) return
     if (status === 'ready' && this.pending) {
       clearTimeout(this.renderTimer)
-      const { profile, asset } = this.pending
+      const { profile, asset, avatar } = this.pending
       this.pending = null
       if (this.currentAsset && this.currentAsset !== asset) this.dropAsset(this.currentAsset)
       this.currentAsset = asset
       this.currentRenderId = id
-      this.visual = { private: profile.source !== 'local' && profile.publicAvatar !== true, identity: this.visualIdentity() }
+      this.visual = { private: avatar.source !== 'local' && avatar.publicAvatar !== true, identity: this.visualIdentity() }
       this.version = Math.max(this.version, profile.profileVersion || 0)
       const roles = [...this.state.roles.filter(item => item.agentId !== profile.agentId), profile].slice(-12)
       this.publish({ current: profile, roles, phase: 'ready', error: '' })
@@ -236,7 +250,8 @@ export class DeviceRuntime extends EventEmitter {
   }
 
   fail(profile, message) {
-    this.publish({ phase: 'error', error: message, progress: null,
+    const optional = profile.source === 'local' && !profile.zipUrl
+    this.publish({ phase: optional ? 'ready' : 'error', error: optional ? '' : message, progress: null,
       renderAsset: this.currentAsset || '', renderId: this.currentRenderId || '' })
     this.report(profile, 'failed', message)
   }

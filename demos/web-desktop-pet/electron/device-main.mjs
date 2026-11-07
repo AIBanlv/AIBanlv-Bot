@@ -231,9 +231,10 @@ async function refreshScore({ force = false } = {}) {
   return job.promise
 }
 let microphoneContext = ''
+const conversationRenderId = () => localMode() && !runtime.state.current?.zipUrl ? '' : runtime.state.renderId
 const microphoneKey = () => {
   const state = snapshot()
-  return state.models.voiceAvailable && deviceInputResult(state).ok ? `${state.current.agentId}:${state.renderId}:${modelRevision}` : ''
+  return state.models.voiceAvailable && deviceInputResult(state).ok ? `${state.current.agentId}:${conversationRenderId()}:${modelRevision}` : ''
 }
 const snapshot = () => ({
   ...channel.state, owner: undefined, ...runtime.state,
@@ -260,7 +261,7 @@ const snapshot = () => ({
 const publicProfile = profile => profile ? {
   agentId: profile.agentId, source: profile.source ?? 'online', agentName: profile.agentName, voiceId: profile.voiceId, language: profile.language, publicAvatar: profile.publicAvatar === true,
   agentPhotoUrl: profile.agentPhotoUrl, description: profile.description || '',
-  kind: profileKind(profile), local: profile.source === 'local',
+  kind: profileKind(profile), local: profile.source === 'local', hasAvatar: Boolean(profile.zipUrl),
 } : null
 const roleChoices = () => {
   const roles = new Map((catalog?.state.profiles || []).map(profile => [profile.agentId, { ...publicProfile(profile), available: true }]))
@@ -286,7 +287,7 @@ const syncConversation = () => {
   // the same role must not keep replaying the previous owner's context. The
   // snapshot itself scrubs the owner, hence it is read from the channel here.
   const key = !closing && windows.state.visible && deviceInputResult(state).ok
-    ? JSON.stringify([storageScope(), state.current, state.renderId, modelRevision]) : ''
+    ? JSON.stringify([storageScope(), state.current, conversationRenderId(), modelRevision]) : ''
   const localActive = !closing && windows.state.visible && state.models.voiceAvailable && deviceInputResult(state).ok
   if (!localActive) lam?.setActive(false)
   conversation.setContext(key)
@@ -447,6 +448,7 @@ async function start() {
   await bindingProof.load()
   httpAuth = new DeviceHttpAuth({ channel, proof: () => bindingProof.httpProof(), origin: process.env.PET_CONTROL_HTTP_ORIGIN })
   runtime = new DeviceRuntime({ channel, files, directory: assetsDirectory,
+    defaultAvatar: signal => loadDefaultProfile(signal, httpAuth.fetch),
     defaultProfile: signal => localWorkspace?.configured() && localWorkspace.roles.has(localWorkspace.config.selectedRole)
       ? localWorkspace.profile(localWorkspace.config.selectedRole) : loadDefaultProfile(signal, httpAuth.fetch),
     download: (url, options) => url.startsWith('local:') ? localWorkspace.avatar(url.slice(6)) : downloadAvatar(url, options),

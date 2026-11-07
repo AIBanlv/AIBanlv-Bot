@@ -159,9 +159,9 @@ const methods = {
       const role={agentId:'online-fixture',agentName:value.name,description:value.description,kind:'private',available:true}
       state.roles.push(role);state.current=role;state.mode='online';await emit('State',state);return {ok:true,role}
     }
-    assert.equal(value.mode,'local');assert.equal(value.media.lam,'fixture-lam');assert.equal(value.media.voice,'fixture-voice')
+    assert.equal(value.mode,'local');assert.equal(value.media.lam,undefined);assert.equal(value.media.voice,'fixture-voice')
     const role={agentId:'local-fixture',agentName:value.name,description:value.description,characterSetting:value.prompt,source:'local',kind:'local',local:true,available:true}
-    state.roles=[role];state.current=role;state.phase='ready';state.mode='local';await emit('State',state);return {ok:true,role}
+    state.roles=[role];state.current=role;state.phase='ready';state.mode='local';setTimeout(()=>void emit('State',state),50);return {ok:true,role}
   },
   openRole: () => ({ok:true,history:[{role:'user',text:'昨天聊过的内容',timestamp:Date.now()-86400000},{role:'assistant',text:'[perform:平静地回应对方并自然表达关切]我记得。[msg_end]',timestamp:Date.now()-86400000}]}),
   roleChat: async value => {
@@ -306,7 +306,8 @@ try {
     await page.locator('#character-lam-project').click()
     assert.equal(lamProjectOpens,1);assert.equal(page.url(),editorUrl,'External project links must not navigate the settings window')
     await page.locator('#character-prompt').fill('你是温柔的小光')
-    await page.locator('#character-lam').click();await page.locator('#character-voice').click()
+    assert.match(await page.locator('label[for="character-lam"]').textContent(),/可选/)
+    await page.locator('#character-voice').click()
     await page.locator('#character-save').click()
     await page.waitForFunction(()=>document.querySelector('#character-chat-history').textContent.includes('昨天聊过的内容'))
     assert.equal(await page.locator('#character-list .character-row').count(),1)

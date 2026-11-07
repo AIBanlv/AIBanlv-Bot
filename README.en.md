@@ -93,7 +93,7 @@ This is a request for an AI assistant, not a terminal command. You still handle 
 | **Your keys · Local characters** | A Qwen Realtime Key handles voice and voice cloning; a DeepSeek Key or connected Harness client handles text and computer tasks. Uses your own provider quota, not AIBanlv credits. No QR binding required. |
 | **AIBanlv App · Online characters** | Public characters can use this machine's 800-point guest allowance without scanning, and reinstalling does not reset it. QR binding claims the remaining guest allowance once for the account, then uses account credits with phone synchronization and cloud storage. |
 
-A new local character needs a licensed LAM ZIP and voice sample. Keys can be saved with OS encryption; local advisory posts still need your own DeepSeek Key. Local storage does not mean offline models: model and voice requests still contact configured providers. See [mode and data boundaries](docs/local-companion-spec.md).
+A new local character needs a name, a character prompt, and a licensed voice sample. The LAM ZIP is optional: without one, the current avatar stays on screen and chatting works normally. Keys can be saved with OS encryption; local advisory posts still need your own DeepSeek Key. Local storage does not mean offline models: model and voice requests still contact configured providers. See [mode and data boundaries](docs/local-companion-spec.md).
 
 ## Data and permissions
 

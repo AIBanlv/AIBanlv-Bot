@@ -49,6 +49,53 @@ test('an asset-free local bot is conversation-ready with no previous avatar and 
   assert.equal(runtime.state.phase, 'ready')
 })
 
+test('a first local bot can chat while the public default loads without adopting its persona or voice', async t => {
+  let resolveDefault
+  const { runtime, channel } = fixture(t, async () => Buffer.from('public avatar'), {
+    defaultAvatar: () => new Promise(resolve => { resolveDefault = resolve }),
+  })
+  const bot = { agentId: 'local-first', source: 'local', zipUrl: '', voiceId: 'own-voice', characterSetting: '自己的设定' }
+  await runtime.apply(bot)
+  assert.equal(runtime.state.phase, 'ready')
+  assert.deepEqual(runtime.state.current, bot)
+  assert.equal(typeof resolveDefault, 'function')
+  resolveDefault({ ...role('waner'), publicAvatar: true })
+  await Promise.all([...runtime.jobs])
+  assert.ok(runtime.state.renderAsset)
+  assert.equal(runtime.state.phase, 'ready', 'Optional rendering never blocks local conversation')
+  runtime.rendered(runtime.state.renderId, 'ready')
+  assert.deepEqual(runtime.state.current, bot)
+  assert.equal(channel.reports.length, 0)
+})
+
+test('default image failures leave a local bot ready, and a late default cannot replace a newly selected avatar', async t => {
+  const bot = { agentId: 'local-first', source: 'local', zipUrl: '', voiceId: 'own-voice' }
+  for (const failure of ['catalog', 'download', 'render']) {
+    const { runtime } = fixture(t, async () => {
+      if (failure === 'download') throw new Error('offline')
+      return Buffer.from('avatar')
+    }, { defaultAvatar: async () => {
+      if (failure === 'catalog') throw new Error('offline')
+      return { ...role('waner'), publicAvatar: true }
+    } })
+    await runtime.apply(bot); await Promise.all([...runtime.jobs])
+    if (failure === 'render') runtime.rendered(runtime.state.renderId, 'error')
+    assert.deepEqual(runtime.state.current, bot)
+    assert.equal(runtime.state.phase, 'ready')
+    assert.equal(runtime.state.error, '')
+  }
+  let resolveDefault
+  const { runtime } = fixture(t, undefined, { defaultAvatar: () => new Promise(resolve => { resolveDefault = resolve }) })
+  await runtime.apply(bot)
+  assert.equal(typeof resolveDefault, 'function')
+  await runtime.apply({ ...role('own'), source: 'local' })
+  runtime.rendered(runtime.state.renderId, 'ready')
+  const asset = runtime.state.renderAsset
+  resolveDefault({ ...role('waner'), publicAvatar: true }); await Promise.all([...runtime.jobs])
+  assert.equal(runtime.state.current.agentId, 'own')
+  assert.equal(runtime.state.renderAsset, asset)
+})
+
 test('reusing a public image never turns a local bot into a platform-funded role, including after revocation', async t => {
   const { runtime, channel } = fixture(t)
   await runtime.apply({ ...role('public-visual'), publicAvatar: true }); runtime.rendered(runtime.state.renderId, 'ready')
@@ -252,7 +299,8 @@ function fixture(t, download = async () => Buffer.from('validated archive'), opt
   channel.report = (profile, status) => channel.reports.push({ profile, status })
   const files = new Map()
   const runtime = new DeviceRuntime({ channel, files, directory: '/test',
-    download, save: async () => {}, remove: async () => {}, defaultProfile: async () => ({ ...role('waner'), publicAvatar: true }), ...options })
+    download, save: async () => {}, remove: async () => {}, defaultProfile: async () => ({ ...role('waner'), publicAvatar: true }),
+    defaultAvatar: async () => null, ...options })
   t.after(() => runtime.dispose())
   return { runtime, channel, files }
 }

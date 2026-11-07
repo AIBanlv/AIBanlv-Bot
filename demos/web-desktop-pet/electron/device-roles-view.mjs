@@ -193,6 +193,7 @@ $('character-editor-form').onsubmit = async event => {
       description: $('character-description').value, prompt: $('character-prompt').value, media, requestId: creationId, consent: $('character-online-consent').checked })
     if (!result?.ok) { $('character-save-status').textContent = result?.message || t('角色保存失败，请重试'); return }
     $('characters-status').textContent = result.message || t('角色已保存')
+    if (result.role?.agentId) update({ ...state, roles: [...roles().filter(role => role.agentId !== result.role.agentId), result.role] })
     navigate('characters'); if (result.role?.agentId) void open(result.role.agentId)
   } catch { $('character-save-status').textContent = t('角色保存失败，请重试') }
   finally { saving = false; $('character-save').disabled = false }

@@ -67,7 +67,8 @@ function update(next) {
   if (!next) return
   const local = next.current?.source === 'local' || next.desired?.source === 'local'
   const bound = local || next.current?.publicAvatar || next.desired?.publicAvatar || next.binding === 'bound' && next.connection === 'connected'
-  const nextContext = `${local ? 'local' : next.binding}:${next.current?.agentId || ''}:${next.renderId}`
+  const renderContext = next.current?.source === 'local' && next.current.hasAvatar === false ? '' : next.renderId
+  const nextContext = `${local ? 'local' : next.binding}:${next.current?.agentId || ''}:${renderContext}`
   const changed = nextContext !== context
   if (changed) {
     stop(); context = nextContext; particleEdge = null
