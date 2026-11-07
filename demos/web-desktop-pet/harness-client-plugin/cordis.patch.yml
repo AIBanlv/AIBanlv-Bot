@@ -1,0 +1,3 @@
+- insert:
+    - id: aibanlv-control-bridge
+      name: dsh-aibanlv-control-bridge

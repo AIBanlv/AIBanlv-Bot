@@ -1,0 +1,30 @@
+.desktop-controller { background: #fff; min-width: 320px; }
+.controller-heading { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--line); }
+.controller-heading > div { display: flex; align-items: center; gap: 12px; }
+.controller-heading h1 { font-size: 18px; }
+.controller-heading #model-status { font-size: 12px; color: var(--green); }
+.controller-section { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.controller-section h2 { font-size: 13px; font-weight: 600; }
+.desktop-controller #preview-text { height: 108px; margin: 12px 0; }
+.desktop-controller #preview-status { min-height: 24px; }
+.desktop-controller #preview-time { font-size: 12px; }
+.desktop-controller .speech-controls { max-width: none; }
+.window-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.window-settings .toggle-row { margin-top: 12px; }
+.window-settings input { flex-shrink: 0; }
+.size-row { margin-top: 20px; }
+.controller-section input[type=range] { margin: 8px 0 0; }
+.controller-footer { display: flex; align-items: center; gap: 12px; padding: 8px 24px; color: var(--muted); font-size: 11px; }
+.controller-footer > span { margin-right: auto; }
+.desktop-pet { background: transparent; width: 100vw; height: 100vh; overflow: hidden; user-select: none; }
+.desktop-pet main { width: 100%; height: 100%; }
+.desktop-pet .caption-slot { height: 120px; padding: 0 6px 12px; pointer-events: none; }
+.desktop-pet .avatar-view { height: calc(100vh - 176px); aspect-ratio: auto; max-height: none; }
+.desktop-pet .loading { pointer-events: none; }
+.desktop-pet .pet-toolbar { width: 170px; height: 40px; margin-top: 8px; box-shadow: none; }
+.desktop-pet .pet-name { margin-right: 0; }
+.desktop-pet .caption-bubble { box-shadow: none; }
+@media (max-width: 400px) {
+  .controller-heading, .controller-section { padding-left: 16px; padding-right: 16px; }
+  .window-settings { gap: 0 16px; }
+}

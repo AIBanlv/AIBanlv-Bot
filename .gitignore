@@ -1,0 +1,67 @@
+# Build and Release Folders
+bin-debug/
+bin-release/
+[Oo]bj/
+[Bb]in/
+
+# Other files and folders
+.settings/
+
+# Executables
+*.swf
+*.air
+*.ipa
+*.apk
+
+# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
+# should NOT be excluded as they contain compiler settings and other important
+# information for Eclipse / Flash Builder.
+
+# Desktop dependencies, build products, and local verification output.
+node_modules/
+dist/
+artifacts/
+__pycache__/
+*.pyc
+*.class
+.idea/
+.vscode/
+.codex_tmp/
+.venv*/
+*.log
+
+# Local settings, credentials, device identity, and private avatar caches.
+.env
+.env.*
+*.local.*
+*.pem
+*.key
+*.jks
+*.p12
+device-identity.json
+display-preferences.json
+display-preferences.json.tmp
+avatars-*/
+
+# Assistant workspace notes and ad-hoc debugging scratch kept out of the product.
+.workbuddy/
+/tasks/
+/_*.py
+/_*.png
+/desktop-shot.*
+/desktop-thumb.*
+
+# Models and redistributable runtimes are supplied outside Git.
+*.tar
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.zip
+*.7z
+*.exe
+*.dll
+*.jar
+*.mlpackage/
+*.mlmodelc/
+*.app/

@@ -1,0 +1,73 @@
+{
+  "name": "control-web-desktop-pet-demo",
+  "private": true,
+  "type": "module",
+  "version": "0.2.8",
+  "main": "electron/main.mjs",
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "pretest": "node scripts/check-node.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "desktop": "electron .",
+    "device": "electron electron/device-main.mjs",
+    "device:test": "node tests/device-electron.mjs",
+    "device:package": "node electron/device-package.mjs",
+    "device:installer": "node electron/device-installer.mjs",
+    "desktop:package": "node electron/package.mjs",
+    "desktop:test": "node tests/electron-smoke.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-attachment-local": "0.2.1-rc.5",
+    "@agentclientprotocol/sdk": "1.4.0",
+    "@deepseek-ai/cordis-plugin-timer": "1.1.7",
+    "@deepseek-ai/dsh-acp": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-agent": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-app-boot": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-compaction-basic": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-deepseek-llm-api-extensions": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-jobs-local": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-llm-deepseek-api-key": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-llm-retry": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-mcp-resources": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-plugin-package-inventory-deepseek": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session-log-deepseek": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session-projection": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-token-meter": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-tool-web": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-web": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-web-fetch-http": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-web-search-deepseek": "0.2.1-rc.5",
+    "fflate": "0.8.3",
+    "electron-updater": "6.8.11",
+    "koffi": "3.1.1",
+    "sharp": "0.35.5",
+    "imapflow": "2.8.0",
+    "mailparser": "3.12.2",
+    "qrcode": "1.5.4",
+    "yauzl": "3.4.0",
+    "ws": "8.22.0"
+  },
+  "overrides": {
+    "@modelcontextprotocol/client": "2.3.0",
+    "undici@8.11.2": "8.12.2",
+    "zod": "4.6.7"
+  },
+  "optionalDependencies": {
+    "dsh-computer-use-mode": "0.1.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "app-builder-bin": "4.2.0",
+    "electron": "44.9.0"
+  }
+}

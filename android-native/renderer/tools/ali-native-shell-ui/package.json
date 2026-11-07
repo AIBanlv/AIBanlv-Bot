@@ -1,0 +1,10 @@
+{
+  "name": "control-windows-renderer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "gaussian-splat-renderer-for-lam": "0.0.8",
+    "three": "0.173.0"
+  }
+}

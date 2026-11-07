@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control - 文字动作控制台</title>
+  <link rel="stylesheet" href="/src/style.css"><link rel="stylesheet" href="/desktop/desktop.css">
+</head>
+<body class="desktop-controller">
+  <header class="controller-heading"><div><span class="brand-mark">C</span><h1>文字动作数字人</h1></div><span id="model-status" role="status">加载中</span></header>
+  <main>
+    <section class="controller-section">
+      <div class="label-row"><h2 id="text-heading">文字与动作</h2><select id="action-tag" aria-label="插入动作标签">
+        <option value="">插入动作</option><option>[摇头]</option><option>[点头]</option><option>[微笑]</option><option>[惊讶]</option><option>[思考]</option><option>[抬头]</option><option>[低头]</option><option>[向左看]</option><option>[向右看]</option><option>[自然]</option>
+      </select></div>
+      <textarea id="preview-text" rows="4" maxlength="160" aria-labelledby="text-heading" spellcheck="false">[点头][微笑]好的，我记住了。很高兴能陪在你身边。</textarea>
+      <div class="speech-controls"><button id="action-play" class="primary-button" disabled aria-pressed="false">显示文字并执行</button><button id="action-stop" class="icon-button" aria-label="停止动作并清除字幕"><span class="stop-symbol" aria-hidden="true"></span></button><output id="action-time" aria-label="动作进度">0.0 s</output></div>
+      <p id="action-status" class="speech-status" role="status" data-state="idle">等待形象加载</p>
+      <p class="speech-status">标签作用于整段文字。同类标签限一个；支持摇头、点头、微笑、惊讶等。无需声音即可执行。</p>
+    </section>
+    <section class="controller-section">
+      <div class="label-row"><h2>悬浮窗口</h2><button id="reset" class="icon-button" aria-label="重置位置"><span class="icon" aria-hidden="true">&#xe6bf;</span></button></div>
+      <div class="window-settings">
+        <label class="toggle-row" for="visible"><span>显示数字人</span><input id="visible" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="pinned"><span>保持置顶</span><input id="pinned" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="captions"><span>显示文字</span><input id="captions" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="click-through"><span>鼠标穿透</span><input id="click-through" type="checkbox" role="switch"></label>
+      </div>
+      <div class="label-row size-row"><label for="size">显示尺寸</label><output id="size-value" for="size">300 px</output></div>
+      <input id="size" type="range" min="240" max="380" step="10" value="300">
+    </section>
+  </main>
+  <footer class="controller-footer"><span>本地文字与动作 · 离线可用</span><button id="retry" class="plain-button" hidden>重新加载形象</button><button id="quit" class="plain-button">退出</button></footer>
+  <script type="module" src="/desktop/controller.mjs"></script>
+</body>
+</html>

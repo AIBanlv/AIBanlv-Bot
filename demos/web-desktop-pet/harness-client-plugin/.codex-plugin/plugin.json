@@ -1,0 +1,7 @@
+{
+  "name": "aibanlv-desktop",
+  "version": "0.2.0",
+  "description": "Start the registered local AIBanlv companion when a Codex session starts. No model or account changes.",
+  "hooks": "./hooks/hooks.json",
+  "interface": { "displayName": "AIBanlv 桌面伴侣", "shortDescription": "会话开始时打开本机桌面伴侣" }
+}

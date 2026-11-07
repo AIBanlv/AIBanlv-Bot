@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control - 数字人控制台</title>
+  <link rel="stylesheet" href="/src/style.css"><link rel="stylesheet" href="/desktop/desktop.css">
+</head>
+<body class="desktop-controller">
+  <header class="controller-heading"><div><span class="brand-mark">C</span><h1>桌面数字人</h1></div><span id="model-status" role="status">加载中</span></header>
+  <main>
+    <section class="controller-section">
+      <div class="label-row"><h2 id="preview-heading">台词与动作</h2>
+        <select id="preview-tag" aria-label="插入动作标签" title="插入动作标签">
+          <option value="">动作标签</option><option value="[摇头]">摇头</option>
+          <option value="[点头]">点头</option><option value="[微笑]">微笑</option>
+          <option value="[惊讶]">惊讶</option><option value="[向左看]">向左看</option>
+          <option value="[向右看]">向右看</option><option value="[H:none]">无头部动作</option>
+        </select>
+      </div>
+      <textarea id="preview-text" rows="4" maxlength="160" aria-labelledby="preview-heading" spellcheck="false">[摇头][微笑]你好，很高兴见到你。今天过得怎么样？</textarea>
+      <div class="speech-controls preview-controls">
+        <button id="preview-play" class="primary-button" disabled aria-pressed="false"><span class="icon" aria-hidden="true">&#xe672;</span><span id="preview-label">静音预览</span></button>
+        <button id="preview-stop" class="icon-button" aria-label="停止静音预览" title="停止或取消生成"><span class="stop-symbol" aria-hidden="true"></span></button>
+        <output id="preview-time" aria-label="静音预览进度">0.0 s</output>
+      </div>
+      <p id="preview-status" class="speech-status" role="status" data-state="idle">待预览</p>
+    </section>
+    <section class="controller-section">
+      <div class="label-row"><h2>悬浮窗口</h2><button id="reset" class="icon-button" aria-label="重置位置" title="重置位置"><span class="icon" aria-hidden="true">&#xe6bf;</span></button></div>
+      <div class="window-settings">
+        <label class="toggle-row" for="visible"><span>显示数字人</span><input id="visible" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="pinned"><span>保持置顶</span><input id="pinned" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="captions"><span>字幕</span><input id="captions" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="click-through"><span>鼠标穿透</span><input id="click-through" type="checkbox" role="switch"></label>
+      </div>
+      <div class="label-row size-row"><label for="size">显示尺寸</label><output id="size-value" for="size">300 px</output></div>
+      <input id="size" type="range" min="300" max="440" step="10" value="360">
+    </section>
+    <section class="controller-section">
+      <div class="label-row"><h2>固定语音试听</h2><span class="tag">EN / 中文字幕</span></div>
+      <div class="speech-controls">
+        <button id="speech-play" class="primary-button" disabled aria-pressed="false"><span class="icon" aria-hidden="true">&#xe684;</span><span id="speech-label">开口说话</span></button>
+        <button id="speech-stop" class="icon-button" aria-label="停止语音" title="停止语音"><span class="stop-symbol" aria-hidden="true"></span></button>
+        <output id="speech-time" aria-label="语音进度">0:00</output>
+      </div>
+      <p id="speech-status" class="speech-status" role="status">等待形象</p>
+      <div class="label-row"><label for="expression">表情预设</label><select id="expression"><option value="natural">自然</option><option value="smile">微笑</option><option value="surprise">惊讶</option><option value="focus">专注</option></select></div>
+      <label class="toggle-row" for="postprocess"><span>Control 后处理</span><input id="postprocess" type="checkbox" role="switch" checked></label>
+      <audio id="speech-audio" preload="none"></audio>
+    </section>
+  </main>
+  <footer class="controller-footer"><span>原始 TAR / PyTorch</span><button id="retry" class="plain-button" hidden>重新加载形象</button><button id="quit" class="plain-button">退出</button></footer>
+  <script type="module" src="/desktop/controller.mjs"></script>
+</body>
+</html>

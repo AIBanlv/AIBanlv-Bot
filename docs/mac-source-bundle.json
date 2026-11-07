@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "version": "1.0.0-candidate.20261105.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "minimumMacOS": "15.0",
+  "filename": "AIBanlv-runtime-1.0.0-candidate.20261105.1-darwin-arm64.zip",
+  "bytes": 612518537,
+  "sha256": "5492459e74a9afdbbfc950a61a16b09a91cad02719e714cb7389cc2fabfdee36",
+  "downloadUrl": "https://download.aibanlv.ai/desktop-runtimes/1.0.0-candidate.20261105.1/darwin-arm64/AIBanlv-runtime-1.0.0-candidate.20261105.1-darwin-arm64.zip",
+  "availability": "public-download",
+  "validation": "pending-native",
+  "nativeARMInferenceVerified": false,
+  "installer": "Install AIBanlv.command",
+  "guide": "MAC_SOURCE_BUNDLE.md"
+}

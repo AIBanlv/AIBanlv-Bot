@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control - 桌面数字人</title>
+  <link rel="stylesheet" href="/src/style.css"><link rel="stylesheet" href="/desktop/desktop.css">
+</head>
+<body class="desktop-pet">
+  <main aria-label="桌面悬浮数字人">
+    <div class="caption-slot"><div id="caption-bubble" class="caption-bubble" hidden><span id="caption-label" class="caption-label"></span><p id="caption" role="status" aria-live="polite"></p></div></div>
+    <div class="avatar-view">
+      <iframe id="avatar" src="/avatar.html" title="透明数字人画面" tabindex="-1" aria-hidden="true"></iframe>
+      <button id="drag-surface" class="drag-surface" aria-label="拖动桌面数字人" title="拖动数字人"></button>
+      <div id="loading" class="loading" role="status"><span id="loading-text">正在加载形象…</span></div>
+    </div>
+    <nav class="pet-toolbar" aria-label="数字人工具">
+      <span class="pet-name"><i></i>Control</span>
+      <button id="controller" class="icon-button" aria-label="打开控制台" title="打开控制台"><span class="icon" aria-hidden="true">&#xe697;</span></button>
+      <button id="reset" class="icon-button" aria-label="重置位置" title="重置位置"><span class="icon" aria-hidden="true">&#xe6bf;</span></button>
+      <button id="hide" class="icon-button" aria-label="隐藏数字人" title="隐藏数字人"><span class="icon" aria-hidden="true">&#xe66f;</span></button>
+    </nav>
+  </main>
+  <script type="module" src="/desktop/pet.mjs"></script>
+</body>
+</html>

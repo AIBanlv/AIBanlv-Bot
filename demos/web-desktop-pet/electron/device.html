@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIBanlv - 桌面伴侣设置</title>
+  <link rel="stylesheet" href="/src/style.css"><link rel="stylesheet" href="/desktop/desktop.css"><link rel="stylesheet" href="/device/device.css">
+</head>
+<body class="desktop-controller device-controller">
+  <svg class="settings-symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="menu-device" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="menu-character" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+    <symbol id="menu-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="menu-window" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M8 6h.01M12 6h.01"/></symbol>
+    <symbol id="menu-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="menu-moments" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m12 3 4 6 5 3-7 1-2 8-2-7-7-2 7-2z"/></symbol>
+    <symbol id="menu-invite" viewBox="0 0 24 24"><path d="M16 4h5v5M21 4l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="menu-plugins" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/></symbol>
+    <symbol id="menu-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M18 18a8 8 0 0 1-14-6"/></symbol>
+    <symbol id="menu-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6M8 12h13"/></symbol>
+  </defs></svg>
+  <aside class="settings-sidebar" aria-label="设置导航">
+    <div class="sidebar-brand"><img src="/device/logo.png" alt="" width="36" height="36"><div>AIBanlv<small>桌面伴侣 · 控制中心</small></div></div>
+    <label class="settings-search"><span aria-hidden="true">⌕</span><input id="settings-search" type="search" placeholder="搜索设置与插件" aria-label="搜索设置与插件"></label>
+    <nav aria-label="设置菜单">
+      <div class="character-menu-heading"><button class="nav-label characters-nav-label" data-section="characters" type="button" aria-label="角色列表">角色列表</button><button id="sidebar-character-new" class="settings-nav character-add" data-section="character-editor" type="button" title="创建角色" aria-label="创建角色"><svg class="menu-icon" aria-hidden="true"><use href="#menu-add"/></svg></button></div>
+      <section class="character-directory sidebar-character-directory" aria-label="角色列表"><label for="character-search" class="sr-only">搜索角色</label><input id="character-search" type="search" placeholder="搜索角色"><div id="character-list" data-no-i18n></div></section>
+    <p class="nav-label">工作空间</p>
+      <button class="settings-nav active" data-section="binding" type="button" title="设备绑定" aria-label="设备绑定" aria-current="page"><svg class="menu-icon" aria-hidden="true"><use href="#menu-device"/></svg><span class="nav-text">设备绑定</span></button>
+      <button class="settings-nav" data-section="role-controls" type="button" title="形象设置" aria-label="形象设置"><svg class="menu-icon" aria-hidden="true"><use href="#menu-character"/></svg><span class="nav-text">形象设置</span></button>
+      <button class="settings-nav" data-section="ai-moments" type="button" title="AI智囊团" aria-label="AI智囊团"><img id="moments-menu-avatar" class="menu-icon moments-menu-avatar" alt="" referrerpolicy="no-referrer" hidden><svg id="moments-menu-default" class="menu-icon" aria-hidden="true"><use href="#menu-moments"/></svg><span class="nav-text">AI智囊团</span></button>
+      <button class="settings-nav" data-section="scheduled-tasks" type="button" title="定时任务" aria-label="定时任务"><svg class="menu-icon" aria-hidden="true"><use href="#menu-clock"/></svg><span class="nav-text">定时任务</span></button>
+      <button class="settings-nav invite-nav" data-section="invite-section" type="button" title="邀请记录" aria-label="邀请记录"><svg class="menu-icon" aria-hidden="true"><use href="#menu-invite"/></svg><span class="nav-text">邀请记录</span></button>
+      <p class="nav-label">能力扩展</p>
+      <button class="settings-nav" data-section="plugins-heading" type="button" title="插件中心" aria-label="插件中心"><svg class="menu-icon" aria-hidden="true"><use href="#menu-plugins"/></svg><span class="nav-text">插件中心</span><span id="plugins-count" class="nav-count">4</span></button>
+    </nav>
+    <div class="sidebar-language"><label for="desktop-language">语言</label><select id="desktop-language" aria-label="语言"><option value="zh-Hans">简体中文</option><option value="zh-Hant">繁體中文</option><option value="en">English</option><option value="ja">日本語</option></select></div>
+    <details id="account-menu" class="sidebar-bottom account-menu">
+      <summary aria-label="账号菜单"><span class="system-light"></span><span id="account-name">未登录</span><span class="account-chevron" aria-hidden="true">⌃</span></summary>
+      <div class="account-popover">
+        <p class="account-caption">当前账号</p><p id="account-menu-name" class="account-user-name">未登录</p>
+        <div class="account-balance"><span>剩余积分</span><span class="account-points-value"><strong id="account-points">—</strong><button id="account-refresh" class="icon-button account-refresh" type="button" title="刷新积分" aria-label="刷新账号积分"><svg class="menu-icon" aria-hidden="true"><use href="#menu-refresh"/></svg></button></span></div>
+        <p id="account-points-status" class="secondary" role="status"></p>
+        <button id="account-details" type="button">积分明细</button>
+        <button id="account-update" type="button">检查更新</button>
+        <button id="account-logout" class="account-danger" type="button" title="关闭软件，保留设备绑定及已保存的设置">退出登录</button>
+        <p id="account-feedback" class="secondary" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+  </aside>
+  <div class="settings-workspace">
+  <header class="controller-heading">
+    <div class="device-brand"><div><span class="eyebrow">COMPANION / SETTINGS</span><h1 id="settings-page-title" tabindex="-1">设备绑定</h1></div></div>
+    <div class="device-tools">
+      <div class="settings-header-actions"><button id="invite-copy" class="plain-button header-invite" type="button" aria-haspopup="dialog" aria-controls="invite-share-dialog"><svg class="menu-icon" aria-hidden="true"><use href="#menu-invite"/></svg><span>分享邀请</span></button></div>
+      <span id="connection" role="status">连接中</span>
+      <button id="refresh" class="icon-button" title="刷新连接" aria-label="刷新连接"><span class="icon" aria-hidden="true">&#xe6bf;</span></button>
+    </div>
+  </header>
+  <main>
+    <button id="settings-back" class="plain-button settings-back" type="button" hidden><svg class="menu-icon" aria-hidden="true"><use href="#menu-back"/></svg><span>返回插件中心</span></button>
+    <div class="settings-page" data-settings-page="binding">
+    <div class="binding-tabs" role="tablist" aria-label="设备绑定设置">
+      <button id="binding-tab-scan" type="button" role="tab" data-binding-tab="scan" aria-controls="binding-panel-scan" aria-selected="true">扫码绑定</button>
+      <button id="binding-tab-keys" type="button" role="tab" data-binding-tab="keys" aria-controls="binding-panel-keys" aria-selected="false" tabindex="-1">本地模式设置</button>
+      <button id="binding-tab-tools" type="button" role="tab" data-binding-tab="tools" aria-controls="binding-panel-tools" aria-selected="false" tabindex="-1">AI 工具状态</button>
+    </div>
+    <div id="binding-panel-scan" role="tabpanel" data-binding-panel="scan" aria-labelledby="binding-tab-scan">
+    <section id="binding" class="controller-section binding-screen" aria-labelledby="binding-title">
+      <div><span class="eyebrow">01 / CONNECTION</span><h2 id="binding-title">设备绑定</h2><p class="secondary">配置自己的 Key 使用本地角色，或下载 App 扫码绑定，同步线上角色与记录。</p></div>
+      <div id="scan-binding">
+        <div class="qr-slot"><img id="qr" alt="设备绑定二维码" width="240" height="240" hidden><span id="qr-status" role="status">正在连接控制服务</span></div>
+        <p class="secondary">下载 AIBanlv App 扫码绑定，进入线上模式，可在手机端同步角色与对话，并长期保存记录。</p>
+        <a href="https://aibanlv.ai/zh?view=desktop-companion" id="download-app" class="plain-button">下载 App</a>
+        <p id="expiry" class="secondary"></p>
+        <p class="secondary">扫码绑定后，AI 伴侣自助注册的免费租户每月可补足 800 对话积分：余额不足 800 时补至 800，达到或超过 800 则不变，每自然月一次。游客、有效付费订阅、其他产品和手动创建的租户不参与。</p>
+      </div>
+      <p id="device-id" class="device-code"></p>
+      <button id="binding-refresh" class="plain-button" type="button">刷新登录二维码</button>
+    </section>
+    <div id="binding-summary" class="controller-section" hidden>
+      <span class="eyebrow">01 / CONNECTION</span><div class="label-row"><h2>设备已连接</h2><button id="device-unbind" class="plain-button" type="button">解除绑定</button></div>
+      <p class="secondary">已与 Control App 建立绑定，可在手机管理设备和同步对话。</p>
+      <p id="binding-action-status" class="secondary" role="status"></p>
+    </div>
+    </div>
+    <div id="binding-panel-keys" role="tabpanel" data-binding-panel="keys" aria-labelledby="binding-tab-keys" hidden>
+    <section class="controller-section" aria-labelledby="model-heading">
+      <h2 id="model-heading">本地设置</h2>
+      <p id="model-current" class="secondary" role="status">正在读取当前角色来源</p>
+      <p id="model-help" class="secondary">本地角色使用本地配置，消耗自己的模型额度，角色与对话不上传平台。配置 Realtime 后支持语音，否则使用 DeepSeek 文字对话。公共线上角色可使用游客试用积分，扫码绑定后使用账号积分。</p>
+      <form id="model-form" class="assistant-form" aria-describedby="model-help">
+        <div class="key-label-row"><label for="model-deepseek">DeepSeek API Key（可选）</label><button type="button" class="provider-console-link" data-provider-console="deepseek">获取 Key ↗</button></div><input id="model-deepseek" type="password" maxlength="512" autocomplete="off" spellcheck="false">
+        <label class="toggle-row" for="deepseek-remember"><span>在本机加密保存 DeepSeek Key</span><input id="deepseek-remember" type="checkbox"></label>
+        <p class="secondary">Harness 客户端已连接并登录时，本地角色的 DeepSeek 对话和电脑任务优先使用客户端账号；未登录时使用这里的 Key。Key 只需填写一次。</p>
+        <div class="key-label-row"><label for="realtime-key">Qwen Realtime API Key</label><button type="button" class="provider-console-link" data-provider-console="qwen">获取 Key ↗</button></div><input id="realtime-key" type="password" maxlength="512" autocomplete="off" spellcheck="false">
+        <label class="toggle-row" for="realtime-remember"><span>在本机加密保存 Realtime Key</span><input id="realtime-remember" type="checkbox"></label>
+        <p id="model-region-status" class="secondary">自动使用本机地区对应的服务，请填写同地区 Key。</p>
+        <details id="model-advanced"><summary>高级连接设置（选填）</summary><label for="model-workspaceId">Workspace ID（选填）</label><input id="model-workspaceId" maxlength="128" autocomplete="off" spellcheck="false"></details>
+        <p class="secondary">使用默认语音模型与音色，无需额外设置。Workspace ID 选填。测试只检测连接，不保存配置，可能产生少量模型用量。</p>
+        <div class="assistant-actions"><button type="submit" class="primary-button">保存模型设置</button><button id="deepseek-test" type="button" class="plain-button">测试 DeepSeek</button><button id="realtime-test" type="button" class="plain-button">测试 Realtime</button><button id="realtime-forget" type="button" class="plain-button">清除 Realtime Key</button><button id="model-deepseek-forget" type="button" class="plain-button">清除 DeepSeek Key</button></div>
+      </form>
+      <p id="model-feedback" class="secondary" role="status" aria-live="polite"></p>
+      <label class="local-check"><input id="local-auto-moments" type="checkbox" checked>自动生成本地智囊团</label><p class="secondary">仅为当天聊过天的本地角色随机生成一条动态；软件关闭时不执行，使用你的 DeepSeek 额度。</p><button id="local-open-documents" type="button" class="plain-button">打开本地文档</button>
+      <h3>本地会话记录</h3><p id="history-sync-status" class="secondary" role="status"></p>
+      <p class="secondary">记录在本机加密保存。线上角色记录按账号同步；本地角色及其对话记录不上传平台，扫码后也不补传。模型调用会将必要上下文发送给所用模型服务。</p>
+      <div class="assistant-actions"><button id="history-export" type="button" class="plain-button">导出当前记录</button><button id="history-clear" type="button" class="plain-button">清除当前本地记录</button></div><p id="history-feedback" class="secondary" role="status"></p>
+    </section>
+    </div>
+    <div id="binding-panel-tools" role="tabpanel" data-binding-panel="tools" aria-labelledby="binding-tab-tools" hidden>
+    <section class="controller-section connected-ai-tools" aria-labelledby="connected-ai-heading"><h2 id="connected-ai-heading">AI 工具状态</h2><div id="connected-ai-tools" class="ai-tools-list" aria-live="polite" data-no-i18n></div></section>
+    </div>
+    </div>
+    <section id="characters" class="settings-page characters-page" data-settings-page="characters" hidden>
+      <p id="characters-status" class="secondary" role="status"></p>
+      <div id="characters-jobs" class="secondary" role="status" data-no-i18n></div>
+      <div class="characters-layout">
+        <section class="character-conversation" aria-label="角色文字对话"><div class="character-chat-heading"><div><h3 id="character-chat-name">选择一个角色开始对话</h3><p id="character-chat-funding" class="secondary" hidden></p></div><button id="character-refresh" class="plain-button" type="button" aria-label="刷新角色" title="刷新角色">↻</button><button id="character-edit" class="plain-button" type="button" hidden>编辑角色</button><button id="character-documents" class="plain-button" type="button" hidden>本地文档</button></div>
+          <div id="character-chat-history" class="character-chat-history" role="log" aria-live="polite" data-no-i18n></div>
+          <form id="character-chat-form" class="character-chat-compose"><label class="sr-only" for="character-message">消息</label><textarea id="character-message" rows="2" maxlength="1000" placeholder="说点什么…" aria-describedby="character-chat-access" required disabled></textarea><button id="character-chat-send" class="primary-button" type="submit" disabled>发送</button><button id="character-chat-stop" class="plain-button" type="button" hidden>停止</button><p id="character-chat-access" class="secondary character-chat-access" role="status" hidden></p></form>
+        </section>
+      </div>
+    </section>
+    <section id="character-editor" class="controller-section settings-page" data-settings-page="character-editor" hidden>
+      <div class="label-row"><h2 id="character-editor-title">新增角色</h2><button id="character-editor-back" class="plain-button" type="button">返回角色列表</button></div>
+      <div id="character-mode-tabs" class="binding-modes" role="group" aria-label="角色模式"><button id="character-mode-local" class="plain-button" type="button">本地角色</button><button id="character-mode-online" class="plain-button" type="button">在线角色</button></div>
+      <p id="character-editor-help" class="secondary"></p>
+      <form id="character-editor-form" class="assistant-form character-editor-form">
+        <div class="character-photo-upload"><img id="character-photo-preview" src="/device/logo.png" alt="角色头像" width="88" height="88"><button id="character-photo" class="plain-button" type="button">上传照片</button><span id="character-photo-name" class="secondary" data-no-i18n></span></div>
+        <label for="character-name">名称</label><input id="character-name" maxlength="80" required>
+        <input id="character-description" type="hidden" maxlength="500">
+        <div id="character-lam-field"><div class="key-label-row"><label>LAM 资产包</label><a id="character-lam-project" class="provider-console-link" href="https://github.com/aigc3d/LAM" target="_blank" rel="noopener noreferrer">LAM 训练项目 ↗</a></div><div class="assistant-actions"><button id="character-lam" class="plain-button" type="button">导入 LAM ZIP</button><span id="character-lam-name" class="secondary" data-no-i18n></span></div></div>
+        <label>声音文件</label><div class="assistant-actions"><button id="character-voice" class="plain-button" type="button">上传声音文件</button><span id="character-voice-name" class="secondary" data-no-i18n></span></div>
+        <p class="secondary">本地角色的声音文件仅保存在电脑；创建音色时会通过你的 Key 发送给 Realtime 服务商。支持 WAV、MP3、M4A、OGG，建议使用清晰、单人且有权使用的声音。</p>
+        <label for="character-prompt">角色提示词</label><textarea id="character-prompt" rows="8" maxlength="32000" placeholder="描述角色的性格、背景与交流方式…" required></textarea>
+        <label id="character-online-consent-field" class="local-check" hidden><input id="character-online-consent" type="checkbox">我确认有权使用这些照片和声音，并同意提交到云端训练。</label>
+        <div class="assistant-actions"><button id="character-save" class="primary-button" type="submit">保存角色</button><button id="character-editor-cancel" class="plain-button" type="button">取消</button></div><p id="character-save-status" class="secondary" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <div class="settings-page" data-settings-page="role-controls" hidden>
+    <p id="role-unavailable" class="secondary" role="status">请先连接设备以选择角色形象。</p>
+    <section id="role-controls" class="controller-section" aria-labelledby="role-heading" hidden>
+      <div class="label-row"><h2 id="role-heading">形象设置</h2><span id="model-status" role="status">加载中</span></div>
+      <p id="role-name" class="secondary">等待形象</p>
+      <div class="role-controls"><label for="roles">角色</label><select id="roles" aria-label="角色形象选择" aria-describedby="catalog-status"></select><button id="catalog-refresh" class="icon-button" title="刷新线上形象" aria-label="刷新线上形象"><span class="icon" aria-hidden="true">&#xe6bf;</span></button></div>
+      <p class="secondary">可通过手机 App 定制私有角色。</p>
+      <p id="catalog-status" class="secondary" role="status" aria-live="polite"></p>
+      <div class="role-controls"><label for="avatar-quality">清晰度</label><select id="avatar-quality" aria-describedby="avatar-quality-help"><option value="auto">自动（按电脑配置）</option><option value="high">细节优先（2 倍采样）</option><option value="balanced">均衡（最高 1.5 倍）</option><option value="low">性能优先</option></select></div>
+      <p id="avatar-quality-help" class="secondary">细节优先可提高画布分辨率，显卡负载也会增加；原形象资产的细节不变。设置自动保存，无需重新下载。</p>
+      <div class="voice-volume"><label for="voice-volume">音量</label><input id="voice-volume" type="range" min="0" max="100" step="1" value="80"><output id="voice-volume-value" for="voice-volume">80%</output><button id="voice-stop" class="icon-button" aria-label="停止回复" title="停止回复"><span class="stop-symbol" aria-hidden="true"></span></button></div>
+    </section>
+    <section id="window-settings" class="controller-section">
+      <div class="label-row"><h2>窗口设置</h2><button id="reset" class="icon-button" aria-label="重置位置" title="重置位置"><span class="icon" aria-hidden="true">&#xe6bf;</span></button></div>
+      <div class="window-settings">
+        <label class="toggle-row" for="startup"><span id="startup-label">开机自动启动</span><input id="startup" type="checkbox" role="switch" aria-describedby="startup-status"></label>
+        <label class="toggle-row" for="visible"><span>显示桌面伴侣</span><input id="visible" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="pinned"><span>保持置顶</span><input id="pinned" type="checkbox" role="switch" checked></label>
+        <label class="toggle-row" for="click-through"><span>鼠标穿透</span><input id="click-through" type="checkbox" role="switch"></label>
+        <label class="toggle-row" for="particles"><span>下方粒子效果</span><input id="particles" type="checkbox" role="switch" aria-describedby="particles-status"></label>
+      </div>
+      <p id="particles-status" class="secondary" role="status" aria-live="polite"></p>
+      <p id="startup-status" class="secondary" role="status" aria-live="polite"></p>
+      <div class="label-row size-row"><label for="size">显示尺寸</label><output id="size-value" for="size">300 px</output></div>
+      <input id="size" type="range" min="300" max="440" step="10" value="360">
+      <p id="render-quality" class="secondary" role="status"></p>
+    </section>
+    </div>
+    <section id="ai-moments" class="controller-section settings-page moments-page" data-settings-page="ai-moments" hidden>
+      <div class="label-row"><h2>AI智囊团</h2><button id="moments-about" type="button" class="icon-button" aria-label="关于AI智囊团" title="关于AI智囊团">ⓘ</button></div>
+      <p id="moments-description" class="secondary">主动式 AI 顾问系统，根据日常互动内容，AI主动讨论并找到解决方案</p>
+      <p class="secondary">线上动态与手机同步；本地角色的动态仅保存在这台电脑。</p>
+      <section id="local-moments-panel" hidden><h3>本地角色动态</h3><p id="local-moments-status" class="secondary" role="status"></p><div id="local-moments-feed" class="moments-feed" data-no-i18n></div></section>
+      <p id="moments-status" class="secondary" role="status" aria-live="polite"></p>
+      <div id="moments-feed-panel">
+        <div class="assistant-actions"><button id="moments-new" class="primary-button" type="button">发表动态</button><button id="moments-refresh" class="plain-button" type="button">刷新动态</button></div>
+        <div id="moments-feed" class="moments-feed" data-no-i18n></div>
+        <button id="moments-more" class="plain-button" type="button" hidden>加载更多</button>
+      </div>
+      <form id="moments-editor" class="assistant-form" hidden>
+        <label for="moments-content">分享此刻</label><textarea id="moments-content" maxlength="2000" rows="5" placeholder="想和你的AI伴侣分享些什么？"></textarea>
+        <div id="moments-media-draft" class="moments-media" data-no-i18n></div>
+        <input id="moments-image-files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        <input id="moments-video-file" type="file" accept="video/mp4,video/quicktime" hidden>
+        <div class="assistant-actions"><button id="moments-add-images" type="button" class="plain-button">添加图片</button><button id="moments-add-video" type="button" class="plain-button">添加视频</button></div>
+        <label for="moments-mentions">提及角色（最多5个）</label><select id="moments-mentions" multiple size="4" aria-describedby="moments-media-help" data-no-i18n></select>
+        <p id="moments-media-help" class="secondary">最多9张图片或1个视频（60秒、30MB）。媒体沿用公开CDN，知道原始链接的人可能访问；不要上传私密内容。</p>
+        <div class="assistant-actions"><button id="moments-publish" type="submit" class="primary-button">发表动态</button><button id="moments-edit-cancel" type="button" class="plain-button">返回动态</button></div>
+      </form>
+      <div id="moments-about-panel" hidden><p class="secondary">主动式 AI 顾问系统，根据日常互动内容，AI主动讨论并找到解决方案</p><p class="secondary">AI每天可能分享1至2条动态，来自近期真实聊天的角色。用户每天前5条动态可获自动评论，最多发表20条、评论100条；实际资格与额度由服务端校验。动态与评论不写入普通聊天记录，AI不会假装看过图片或视频。</p><button id="moments-about-back" class="plain-button" type="button">返回动态</button></div>
+    </section>
+    <section id="scheduled-tasks" class="controller-section settings-page" data-settings-page="scheduled-tasks" hidden>
+      <div class="label-row"><h2>定时任务</h2><div class="assistant-actions"><button id="memo-new" class="primary-button" type="button" aria-expanded="false" aria-controls="memo-form">添加任务</button><button id="memo-refresh" class="plain-button" type="button">刷新任务</button></div></div>
+      <p class="secondary">与手机共享定时任务，支持单次和每日重复。电脑关闭后仍由服务端执行；通知遵循手机通知设置。</p>
+      <p id="notification-status" class="secondary" role="status" aria-live="polite"></p>
+      <form id="memo-form" class="assistant-form" hidden>
+        <label for="memo-role">角色</label><select id="memo-role" required></select>
+        <label for="memo-content">任务内容</label><textarea id="memo-content" maxlength="1000" rows="3" required></textarea>
+        <label for="memo-repeat">重复</label><select id="memo-repeat"><option value="none">仅一次</option><option value="daily">每天</option></select>
+        <label for="memo-date">日期</label><input id="memo-date" type="date" required>
+        <label for="memo-time">时间</label><input id="memo-time" type="time" required>
+        <p id="memo-timezone" class="secondary"></p>
+        <div class="assistant-actions"><button id="memo-save" class="primary-button" type="submit">添加定时任务</button><button id="memo-cancel" class="plain-button" type="button">取消添加</button></div>
+      </form>
+      <p id="memo-status" class="secondary" role="status"></p><div id="memo-list" class="workbuddy-list" data-no-i18n></div>
+      <div class="assistant-actions"><button id="memo-prev" class="plain-button" type="button">上一页</button><button id="memo-next" class="plain-button" type="button">下一页</button></div>
+    </section>
+    <section id="invite-section" class="controller-section settings-page invite-page" data-settings-page="invite-section" hidden>
+      <div class="label-row"><h2>邀请记录</h2><button id="invite-record-refresh" class="plain-button" type="button">刷新记录</button></div>
+      <p id="invite-record-status" class="secondary" role="status" aria-live="polite"></p>
+      <div class="invite-record-head secondary"><span>账户名称</span><span>成功时间</span></div><div id="invite-record-list" data-no-i18n></div>
+      <div class="points-pagination"><button id="invite-record-prev" class="plain-button" type="button">上一页</button><span id="invite-record-page" class="secondary"></span><button id="invite-record-next" class="plain-button" type="button">下一页</button></div>
+    </section>
+    <div class="settings-page" data-settings-page="plugins-heading" hidden>
+    <div id="plugins-heading" class="section-heading"><div><span class="eyebrow">EXTENSIONS / WORKSPACE</span><h2>插件中心</h2></div><span class="secondary">扩展数字人的行动力</span></div>
+    <h3 class="plugins-subheading">内置插件</h3>
+    <div class="plugin-overview" aria-label="已集成插件">
+      <button class="plugin-shortcut" data-plugin="assistant-heading" type="button"><span class="plugin-icon harness-icon" aria-hidden="true">H</span><span>Harness<small>搜索与电脑操作</small></span><span aria-hidden="true">↗</span></button>
+      <button class="plugin-shortcut" data-plugin="mail-heading" type="button"><span class="plugin-icon mail-icon" aria-hidden="true">✉</span><span>只读邮箱<small>来信与邮件摘要</small></span><span aria-hidden="true">↗</span></button>
+      <button class="plugin-shortcut" data-plugin="workbuddy-heading" type="button"><span class="plugin-icon workbuddy-icon" aria-hidden="true">W</span><span>WorkBuddy<small>本机任务监控</small></span><span aria-hidden="true">↗</span></button>
+      <button class="plugin-shortcut" data-plugin="codex-heading" type="button"><span class="plugin-icon codex-icon" aria-hidden="true">⌘</span><span>Codex<small>创建任务与进展汇报</small></span><span aria-hidden="true">↗</span></button>
+    </div>
+    <div class="online-plugins-heading"><h3 id="online-plugins-title" class="plugins-subheading">线上插件</h3><button id="online-plugins-refresh" class="plain-button" type="button">刷新线上插件</button></div>
+    <p id="online-plugins-status" class="secondary" role="status" aria-live="polite"></p>
+    <div id="online-plugins-list" class="online-plugins-list" role="list" aria-labelledby="online-plugins-title" data-no-i18n></div>
+    </div>
+    <section class="controller-section plugin-card settings-page" data-settings-page="assistant-heading" aria-labelledby="assistant-heading" hidden>
+      <div class="plugin-heading"><span class="plugin-icon harness-icon" aria-hidden="true">H</span><div><h2 id="assistant-heading">Harness <span class="plugin-badge">已内置电脑助手</span></h2><p class="secondary">无需额外下载，模拟操作电脑一切任务</p></div><span class="plugin-indicator" id="assistant-indicator">未启用</span></div>
+      <p id="assistant-onboarding" class="ai-tools-guide" role="status" hidden>未发现已就绪的 AI 工具，请填写或确认 DeepSeek API Key，然后保存并启用 Harness。</p>
+      <p id="assistant-help" class="secondary">使用已登录的 Harness 客户端，或在“模型配置”填写自己的 DeepSeek Key，即可请求电脑任务。客户端连接时，任务交给 Harness 执行，并遵循客户端的权限设置；未连接时，使用内置助手和自有 Key。内置助手支持打开应用、整理桌面、搜索或总结邮件；Windows 鼠标键盘操作每步需确认。任务所需的屏幕、文件和邮件内容会发送给当前模型服务，可能产生供应商费用。截图和文件可直传已绑定的手机，单文件最多 8 MiB。可随时停止任务；测试当前连接也会产生少量供应商用量。</p>
+      <p class="secondary">先在 Harness 客户端安装 AIBanlv 连接插件。客户端打开并登录后自动使用其账号；客户端关闭后，使用“模型配置”里保存的自有 Key。</p>
+      <p id="assistant-source" class="secondary" role="status"></p>
+      <div id="assistant-form" class="assistant-form" aria-describedby="assistant-help">
+        <label class="toggle-row" for="assistant-enabled"><span>启用电脑助手</span><input id="assistant-enabled" type="checkbox"></label>
+        <div class="assistant-actions"><button id="assistant-model-settings" class="plain-button" type="button">前往模型配置</button><button id="assistant-test" class="plain-button" type="button">测试当前连接</button><button id="assistant-log" class="plain-button" type="button">诊断日志</button></div>
+      </div>
+      <p id="assistant-status" class="secondary" role="status" aria-live="polite">未开启</p>
+      <div id="assistant-log-panel" hidden>
+        <pre id="assistant-log-view" class="assistant-log" aria-label="助手诊断日志"></pre>
+        <p class="secondary"><button id="assistant-log-open" class="plain-button" type="button">用记事本打开完整日志</button><span id="assistant-log-path"></span></p>
+      </div>
+    </section>
+    <section class="controller-section plugin-card settings-page" data-settings-page="mail-heading" aria-labelledby="mail-heading" hidden>
+      <div class="plugin-heading"><span class="plugin-icon mail-icon" aria-hidden="true">✉</span><div><h2 id="mail-heading">只读邮箱 <span class="plugin-badge">IMAP</span></h2><p class="secondary">邮件摘要与来信提醒</p></div></div>
+      <p id="mail-help" class="secondary">先在邮箱设置中开启 IMAP，填写客户端授权码。仅查看收件箱，不发信、不删除、不改变已读状态。按你的任务共享邮件标题或正文给 Harness 配置的模型服务与对话服务，无需逐次确认。</p>
+      <form id="mail-form" class="assistant-form" aria-describedby="mail-help">
+        <label for="mail-provider">邮箱类型</label>
+        <select id="mail-provider"><option value="qq">QQ / Foxmail</option><option value="163">163 邮箱</option><option value="126">126 邮箱</option></select>
+        <label for="mail-user">邮箱地址</label>
+        <input id="mail-user" type="email" maxlength="254" required autocomplete="off" spellcheck="false" placeholder="完整邮箱地址">
+        <label for="mail-password">客户端授权码</label>
+        <input id="mail-password" type="password" maxlength="256" autocomplete="off" spellcheck="false" placeholder="填写客户端授权码">
+        <label class="toggle-row" for="mail-remember"><span>在本机加密记住邮箱</span><input id="mail-remember" type="checkbox"></label>
+        <label class="toggle-row" for="mail-notifications"><span>来信时显示本机通知</span><input id="mail-notifications" type="checkbox" aria-describedby="mail-notify-help"></label>
+        <p id="mail-notify-help" class="secondary">加密记住后自动恢复启用状态，每 2 分钟检查一次；首次检查建立基线，不提醒历史邮件。未开启内容播报时只提示新邮件数量。</p>
+        <label class="toggle-row" for="mail-content-announcements"><span>新邮件内容播报</span><input id="mail-content-announcements" type="checkbox" aria-describedby="mail-content-help"></label>
+        <p id="mail-content-help" class="secondary">开启后读取最近 3 封新邮件的发件人、主题和正文节选，通过当前对话服务语音汇报，可能消耗对话积分。正文不保存到本地配置，不读取附件、不改变未读状态。需要更多内容可在对话中说“读出最新邮件的正文”。</p>
+        <div class="assistant-actions"><button id="mail-save" class="primary-button" type="submit">保存并启用邮箱</button><button id="mail-pause" class="plain-button" type="button" disabled>暂停邮箱</button><button id="mail-forget" class="plain-button" type="button" disabled>移除邮箱</button><button id="mail-check" class="plain-button" type="button" disabled>立即检查</button></div>
+      </form>
+      <p id="mail-status" class="secondary" role="status" aria-live="polite">未启用邮箱</p>
+    </section>
+    <section class="controller-section plugin-card settings-page" data-settings-page="workbuddy-heading" aria-labelledby="workbuddy-heading" hidden>
+      <div class="plugin-heading"><span class="plugin-icon workbuddy-icon" aria-hidden="true">W</span><div><h2 id="workbuddy-heading">WorkBuddy <span class="plugin-badge">本机任务</span></h2><p class="secondary">关注任务、接收确认、汇报进展</p></div><span id="workbuddy-state" class="plugin-indicator" role="status">未监控</span></div>
+      <p class="secondary">通过 Harness 调度本机 WorkBuddy 创建任务并汇报结果；保留已有任务的只读监控。请先在 WorkBuddy 登录，然后直接在对话中说明任务。执行仍受 WorkBuddy 自身策略限制。</p>
+      <p class="secondary">工作空间选择、规划、审核与汇报统一由 Harness 处理。请直接在对话中说明任务。</p>
+      <label class="toggle-row" for="workbuddy-announce"><span>用数字人播报任务进展</span><input id="workbuddy-announce" type="checkbox" role="switch" checked></label>
+      <div id="workbuddy-log" class="plugin-log" role="region" aria-label="WorkBuddy 任务日志" tabindex="0">
+        <div id="workbuddy-managed" class="workbuddy-list" aria-live="polite"></div>
+        <div id="workbuddy-list" class="workbuddy-list"></div>
+      </div>
+    </section>
+    <section class="controller-section plugin-card settings-page" data-settings-page="codex-heading" aria-labelledby="codex-heading" hidden>
+      <div class="plugin-heading"><span class="plugin-icon codex-icon" aria-hidden="true">⌘</span><div><h2 id="codex-heading">Codex <span class="plugin-badge">App Server</span></h2><p class="secondary">创建任务 · 实时进度 · 数字人汇报</p></div><span id="codex-state" class="plugin-indicator" role="status">未连接</span></div>
+      <p class="secondary">自动连接本机已登录的 Codex，断线自动重连，只读监控各项目任务。工作空间仅用于创建任务，不限制监控范围；其他窗口的审批与停止仍由原窗口处理。</p>
+      <label class="toggle-row" for="codex-announce"><span>用数字人播报任务进展</span><input id="codex-announce" type="checkbox" role="switch" checked></label>
+      <div class="assistant-actions"><button id="codex-connect" class="primary-button" type="button">连接 Codex</button><button id="codex-disconnect" class="plain-button" type="button" disabled>断开</button></div>
+      <p id="codex-status" class="secondary" role="status" aria-live="polite">使用本机 Codex 登录，无需重复填写 Key。</p>
+      <p class="secondary">工作空间选择、规划、审核与汇报统一由 Harness 处理。请直接在对话中说明任务。</p>
+      <div id="codex-log" class="plugin-log" role="region" aria-label="Codex 任务日志" tabindex="0"><div id="codex-tasks" class="workbuddy-list" aria-live="polite"></div></div>
+    </section>
+    <section class="controller-section settings-page" data-settings-page="points-details" aria-labelledby="points-heading" hidden>
+      <div class="label-row"><h2 id="points-heading">积分明细</h2><button id="points-refresh" class="icon-button" type="button" title="刷新积分明细" aria-label="刷新积分明细"><svg class="menu-icon" aria-hidden="true"><use href="#menu-refresh"/></svg></button></div>
+      <p class="secondary">当前绑定账号的积分余额与收支记录，与手机端同步。</p>
+      <div class="points-balance"><span>剩余积分</span><strong id="points-balance">—</strong></div>
+      <p id="points-status" class="secondary" role="status" aria-live="polite"></p>
+      <div id="points-records" class="points-records" aria-label="积分变动记录" data-no-i18n></div>
+      <div class="points-pagination"><button id="points-prev" class="plain-button" type="button" disabled>上一页</button><span id="points-page" class="secondary">1</span><button id="points-next" class="plain-button" type="button" disabled>下一页</button></div>
+    </section>
+    <section class="controller-section settings-page" data-settings-page="search" aria-label="设置搜索结果" hidden><h2>搜索结果</h2><div id="settings-search-results" class="settings-search-results"></div><p id="settings-search-empty" class="secondary" hidden>没有找到相关设置。</p></section>
+  </main>
+  <p id="score-status" class="device-feedback" role="status" aria-live="polite"></p>
+  <p id="feedback" class="device-feedback" role="status" aria-live="polite"></p>
+  <footer class="controller-footer">
+    <span>AIBanlv</span><button id="retry" class="plain-button" hidden>重试形象</button>
+  </footer>
+  </div>
+  <dialog id="invite-share-dialog" class="invite-share-dialog" aria-labelledby="invite-share-title" aria-describedby="invite-share-description">
+    <div class="invite-share-heading"><div><span class="eyebrow" aria-hidden="true">SHARE / REWARDS</span><h2 id="invite-share-title">推荐好友，一起获得奖励！</h2></div><button id="invite-share-close" type="button" aria-label="关闭邀请" autofocus>×</button></div>
+    <p id="invite-share-description" class="secondary">邀请好友体验 AI 伴侣，分享陪伴，一起获得积分奖励。</p>
+    <div class="invite-share-field"><div><label for="invite-share-url">电脑客户端邀请链接</label><input id="invite-share-url" type="text" readonly value="" data-no-i18n></div><button id="invite-share-copy-url" class="primary-button" type="button" disabled>复制电脑链接</button></div>
+    <div class="invite-share-field"><div><label for="invite-share-app-url">手机 App 邀请链接</label><input id="invite-share-app-url" type="text" readonly value="" data-no-i18n></div><button id="invite-share-copy-app-url" class="primary-button" type="button" disabled>复制手机链接</button></div>
+    <div class="invite-share-field"><div><label for="invite-share-installation">AI 工具一键安装提示词</label><textarea id="invite-share-installation" rows="2" readonly data-no-i18n></textarea></div><button id="invite-share-copy-installation" class="primary-button" type="button">复制提示词</button></div>
+    <p id="invite-share-status" class="secondary" role="status" aria-live="polite"></p><button id="invite-share-retry" class="plain-button" type="button" hidden>重试</button>
+    <section class="invite-share-rules" aria-labelledby="invite-rules-title"><h3 id="invite-rules-title">活动规则</h3><article><span class="invite-rule-number" aria-hidden="true">01</span><div><h4>邀请好友注册</h4><p>好友首次注册填写你的邀请码，双方各得 1,000 积分。</p></div></article></section>
+  </dialog>
+  <dialog id="moments-comment-dialog" class="moments-dialog" aria-labelledby="moments-comment-title">
+    <form id="moments-comment-form" class="assistant-form"><h2 id="moments-comment-title">评论与回复</h2><p id="moments-reply-to" class="secondary" data-no-i18n></p>
+      <label for="moments-comment-content">评论内容</label><textarea id="moments-comment-content" maxlength="1000" rows="4" required></textarea><p id="moments-comment-status" class="secondary" role="status"></p>
+      <div class="assistant-actions"><button id="moments-comment-save" class="primary-button" type="submit">发送评论</button><button id="moments-comment-cancel" class="plain-button" type="button">取消</button></div>
+    </form>
+  </dialog>
+  <dialog id="moments-confirm-dialog" class="moments-dialog" aria-labelledby="moments-confirm-title"><h2 id="moments-confirm-title">确认删除？</h2><p class="secondary">此操作将同步到手机，无法撤销。</p><p id="moments-confirm-status" class="secondary" role="status"></p><div class="assistant-actions"><button id="moments-confirm-delete" class="primary-button" type="button">确认删除</button><button id="moments-confirm-cancel" class="plain-button" type="button">取消</button></div></dialog>
+  <dialog id="moments-media-dialog" class="moments-dialog media-dialog" aria-label="动态媒体预览"><div id="moments-media-preview" data-no-i18n></div><button id="moments-media-close" class="plain-button" type="button">关闭预览</button></dialog>
+  <dialog id="desktop-update-dialog" class="desktop-update-dialog" aria-labelledby="desktop-update-title" aria-describedby="desktop-update-status">
+    <h2 id="desktop-update-title">软件更新</h2>
+    <p id="desktop-update-version" class="secondary"></p>
+    <p id="desktop-update-status" role="status" aria-live="polite"></p>
+    <div id="desktop-update-source" hidden>
+      <p id="desktop-update-revision" class="secondary" data-no-i18n></p>
+      <p id="desktop-update-source-status" class="secondary"></p>
+      <p class="secondary">点击“更新并重启”后，程序会自动退出、拉取代码并按需安装依赖，完成后重新打开。请先结束正在进行的对话和任务。</p>
+    </div>
+    <p id="desktop-update-notes" class="secondary" hidden></p>
+    <progress id="desktop-update-progress" aria-label="安装包下载与重建进度" max="100" value="0" hidden></progress>
+    <p id="desktop-update-size" class="secondary" hidden></p>
+    <div class="assistant-actions">
+      <button id="desktop-update-check" type="button" class="plain-button">重新检查</button>
+      <button id="desktop-update-download" type="button" class="primary-button" hidden>下载更新</button>
+      <button id="desktop-update-cancel" type="button" class="plain-button" hidden>取消下载</button>
+      <button id="desktop-update-install" type="button" class="primary-button" hidden>退出并安装</button>
+      <button id="desktop-update-close" type="button" class="plain-button" autofocus>稍后</button>
+    </div>
+  </dialog>
+  <script type="module" src="/device/device-view.mjs"></script>
+</body>
+</html>

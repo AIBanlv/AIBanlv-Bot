@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$PLUGIN_ROOT/run.sh\" --auto",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwA7ACAAJgAgACgASgBvAGkAbgAtAFAAYQB0AGgAIAAkAGUAbgB2ADoAUABMAFUARwBJAE4AXwBSAE8ATwBUACAAJwByAHUAbgAuAHAAcwAxACcAKQAgAC0AQQB1AHQAbwBtAGEAdABpAGMA",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

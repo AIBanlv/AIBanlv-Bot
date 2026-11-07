@@ -1,0 +1,6 @@
+artifacts/
+*.local.*
+__pycache__/
+assets/
+node_modules/
+dist/

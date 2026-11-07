@@ -1,0 +1,28 @@
+name: Shared desktop
+on:
+  # 仅 README 和演示素材变更时跳过；包含代码或配置变更时仍执行检查。
+  push:
+    paths-ignore:
+      - 'README*.md'
+      - 'docs/image/**'
+      - 'docs/video/**'
+  pull_request:
+    paths-ignore:
+      - 'README*.md'
+      - 'docs/image/**'
+      - 'docs/video/**'
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - run: npm ci
+      - run: npm run setup
+      - run: npm test

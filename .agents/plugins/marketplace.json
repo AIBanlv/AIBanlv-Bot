@@ -1,0 +1,12 @@
+{
+  "name": "aibanlv-local",
+  "interface": { "displayName": "AIBanlv 本地插件" },
+  "plugins": [
+    {
+      "name": "aibanlv-desktop",
+      "source": { "source": "local", "path": "./demos/web-desktop-pet/harness-client-plugin" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

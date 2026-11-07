@@ -1,0 +1,12 @@
+{
+  "name": "dsh-aibanlv-control-bridge",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "main": "plugin.mjs",
+  "exports": { ".": "./plugin.mjs", "./cordis.patch.yml": "./cordis.patch.yml" },
+  "files": ["plugin.mjs", "cordis.patch.yml", "README.md", "desktop-launch.mjs", "desktop-mcp.mjs", "run.ps1", "run.sh", ".codex-plugin/plugin.json", "hooks/hooks.json"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "engines": { "node": ">=22.12.0", "dsh": ">=0.2.1-rc.2 <0.3.0" },
+  "peerDependencies": { "@deepseek-ai/cordis": "4.0.5" }
+}

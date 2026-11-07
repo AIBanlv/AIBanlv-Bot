@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIBanlv - 桌面伴侣</title>
+  <link rel="stylesheet" href="/src/style.css"><link rel="stylesheet" href="/desktop/desktop.css"><link rel="stylesheet" href="/device/device.css">
+</head>
+<body class="desktop-pet device-pet">
+  <main aria-label="桌面伴侣">
+    <canvas id="device-particles" aria-hidden="true" hidden></canvas>
+    <div class="avatar-view">
+      <div id="avatar-host"></div>
+      <button id="drag-surface" class="drag-surface" aria-label="触碰数字人，可轻点、双击、长按或抚摸，Enter、空格互动，方向键移动窗口"></button>
+      <div id="loading" class="loading" role="status"><span id="loading-text">等待设备绑定</span></div>
+    </div>
+    <div id="chat-bubbles-panel" class="caption-slot">
+      <button id="task-summary" class="task-summary" type="button" aria-label="实时信息与对话，悬浮或聚焦查看记录" aria-live="polite" aria-expanded="false" aria-controls="task-records" hidden></button>
+      <div id="task-records" class="task-records" role="log" aria-label="实时信息与双方对话记录" tabindex="0" hidden></div>
+    </div>
+    <form id="chat-form" class="chat-composer" aria-label="文字与语音对话" data-mode="text">
+      <div class="chat-field">
+        <div class="chat-input">
+          <textarea id="chat-text" rows="1" maxlength="1000" aria-label="对话内容" aria-describedby="chat-status" placeholder="输入消息" spellcheck="false" disabled></textarea>
+          <div id="chat-waveform" class="chat-waveform" aria-hidden="true" hidden><canvas id="chat-waveform-canvas"></canvas></div>
+        </div>
+        <div class="chat-status-row">
+          <span id="chat-link" class="chat-link" role="img" data-state="offline" title="离线" aria-label="对话离线"></span>
+          <p id="chat-status" role="status" aria-live="polite">等待设备绑定</p>
+          <span id="microphone-status" role="status" aria-live="polite"></span>
+        </div>
+        <div class="chat-actions">
+          <button id="pet-drag" class="pet-drag icon-button" type="button" aria-label="拖动桌面数字人，方向键移动" title="按住此处移动窗口，或使用方向键"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></button>
+          <button id="controller" class="icon-button chat-action" type="button" aria-label="打开设置" title="桌面伴侣设置"><span class="icon" aria-hidden="true">&#xe664;</span></button>
+          <button id="hide" class="icon-button chat-action" type="button" aria-label="隐藏数字人" title="隐藏数字人"><span class="icon" aria-hidden="true">&#xe66f;</span></button>
+          <input id="pet-size" class="pet-size" type="range" min="300" max="440" step="10" value="360" aria-label="显示尺寸" title="拖动调整数字人显示尺寸">
+          <button id="pet-audio" class="icon-button pet-audio" type="button" aria-pressed="false" aria-label="关闭音频" title="点击关闭音频，再点一次恢复">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M4 9.5v5h3.6L12 18V6L7.6 9.5H4z"/><path class="audio-wave" d="M15.6 9.2a4 4 0 0 1 0 5.6M18.2 6.8a7.5 7.5 0 0 1 0 10.4"/><path class="audio-slash" d="m4 20 16-16"/></svg>
+          </button>
+          <input id="pet-volume" class="pet-volume" type="range" min="0" max="100" step="5" value="80" aria-label="音量" title="拖动调整语音音量">
+          <button id="chat-microphone" class="icon-button" type="button" aria-label="开启麦克风" aria-pressed="false" aria-describedby="microphone-status" title="开启麦克风，直接语音对话" data-state="off" disabled>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M8 21h8"/><path class="microphone-slash" d="m3 3 18 18"/></svg>
+          </button>
+          <button id="chat-send" class="icon-button" type="submit" aria-label="发送消息" title="发送消息" disabled><span id="chat-send-icon" class="icon" aria-hidden="true">&#xe672;</span><span id="chat-stop-icon" class="stop-symbol" aria-hidden="true" hidden></span></button>
+        </div>
+      </div>
+    </form>
+  </main>
+  <script type="module" src="/device/device-pet.mjs"></script>
+  <script type="module" src="/device/device-activity-view.mjs"></script>
+</body>
+</html>
