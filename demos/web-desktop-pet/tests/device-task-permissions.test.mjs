@@ -57,3 +57,14 @@ test('user choices must match the options and cancelled questions never invent a
       selected === 'Yes' ? { answers: { q: { answers: ['Yes'] } } } : { answers: {} })
   }
 })
+
+test('explicitly continued external turns require their own matching local confirmation', async () => {
+  const managed = { ...task, id: 'thread', external: true, managedTurnId: 'continued' }
+  const confirm = async () => ({ decision: 'allow' })
+  assert.deepEqual(await reviewTaskRequest({ confirm, task: managed, method: methods[0],
+    params: { threadId: managed.id, turnId: 'continued' } }), { decision: 'accept' })
+  for (const turnId of ['previous', undefined]) {
+    assert.deepEqual(await reviewTaskRequest({ confirm: async () => assert.fail('unmanaged turn must not prompt'),
+      task: managed, method: methods[0], params: { threadId: managed.id, turnId } }), { decision: 'decline' })
+  }
+})

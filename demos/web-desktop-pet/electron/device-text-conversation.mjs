@@ -87,6 +87,7 @@ export class DeviceTextConversation {
     } catch (error) {
       if (!this.valid(turn)) return { ok: false, code: 'CANCELLED' }
       const message = error?.code?.startsWith('HARNESS_CLIENT_') ? 'Harness 客户端连接或任务失败，请在客户端核对后重试；本次未改用自有 Key'
+        : error?.code === 'TASK_DISPATCH_FAILED' ? error.message.slice(0, 400)
         : error?.code?.startsWith('HISTORY_') ? '历史记忆恢复失败，请检查控制服务连接后重试'
         : 'DeepSeek 文字回复失败，请检查 Key 或网络后重试'
       this.emit(turn, { type: 'error', message })

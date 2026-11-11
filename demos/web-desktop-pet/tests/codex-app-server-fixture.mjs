@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline'
 const send = value => process.stdout.write(JSON.stringify(value) + '\n')
 const notify = (method, params) => send({ method, params })
 const tasks = new Map()
-let next = 0
+let next = 0, nextTurn = 0
 createInterface({ input: process.stdin }).on('line', line => {
   const { id, method, params = {}, result } = JSON.parse(line)
   if (!method) {
@@ -20,9 +20,13 @@ createInterface({ input: process.stdin }).on('line', line => {
   else if (method === 'thread/start') {
     const thread = { id: `fixture-${++next}`, status: 'idle', cwd: params.cwd }
     tasks.set(thread.id, thread); reply({ thread })
+  } else if (method === 'thread/resume') {
+    reply({ thread: tasks.get(params.threadId) })
   } else if (method === 'turn/start') {
     const task = tasks.get(params.threadId)
-    task.turnId = `turn-${next}`; task.status = 'inProgress'
+    task.turnCount = (task.turnCount || 0) + 1
+    task.lastInput = params.input
+    task.turnId = `turn-${++nextTurn}`; task.status = 'inProgress'
     reply({ turn: { id: task.turnId, status: task.status } })
     const scope = { threadId: task.id, turnId: task.turnId }
     notify('turn/started', { ...scope, turn: { id: task.turnId } })

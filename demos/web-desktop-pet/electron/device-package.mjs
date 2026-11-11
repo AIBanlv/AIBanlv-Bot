@@ -61,7 +61,7 @@ export function deviceBundleFiles() {
     'device-mail-settings.mjs', 'device-mail-client.mjs', 'device-mail-service.mjs', 'device-mail-view.mjs',
     'device-workbuddy.mjs', 'device-workbuddy-view.mjs', 'device-assistant-log.mjs',
     'device-remote-replies.mjs', 'device-notifications.mjs', 'device-notification-sync.mjs', 'device-first-greeting.mjs',
-    'device-codex.mjs', 'device-codex-rollout.mjs', 'device-ai-tools.mjs', 'device-codex-view.mjs', 'device-activity.mjs', 'device-activity-view.mjs',
+    'device-codex.mjs', 'device-codex-rollout.mjs', 'device-codex-queue.mjs', 'device-codex-remote.mjs', 'device-remote-tools.mjs', 'device-ai-tools.mjs', 'device-codex-view.mjs', 'device-activity.mjs', 'device-activity-view.mjs',
     'device-task-dispatcher.mjs', 'device-task-routing.mjs', 'device-workbuddy-agent.mjs',
     'device-account.mjs',
     'device-update.mjs', 'device-update-install.mjs', 'device-update-install.ps1', 'device-update-view.mjs',

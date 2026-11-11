@@ -6,6 +6,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { redact } from './device-assistant-log.mjs'
 import { CodexRolloutReader } from './device-codex-rollout.mjs'
+import { queueCodexMessage } from './device-codex-queue.mjs'
 
 const clean = (value, limit = 4000) => typeof value === 'string'
   ? value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').slice(0, limit) : ''
@@ -15,6 +16,7 @@ const userRequest = items => items.filter(item => item?.type === 'userMessage')
   .filter(Boolean).join('\n').slice(-1200)
 const turnItems = (data, turnId) => (Array.isArray(data) ? data : []).filter(entry => !entry.turnId || entry.turnId === turnId).map(entry => entry.item || entry)
 export function codexFailure(detail, fallback = 'Codex 连接失败，请检查本机安装与登录。') {
+  if (/already has an active writer/i.test(detail)) return '原 Codex 窗口仍持有此会话，不能从另一个进程接管，请使用原会话的消息队列。'
   if (/workspace routing discovery timed out/i.test(detail)) return 'Codex 账号工作空间路由查询超时，将自动重连；当前无法确认任务状态，请检查 Codex 的账号连接与网络。'
   if (/code-mode-host|配套执行程序/i.test(detail)) return 'Codex 配套执行程序缺失，请选择包含 codex-code-mode-host.exe 的完整 CLI 安装，不能只复制 codex.exe。'
   if (/sqlite state runtime|state runtime|access is denied|拒绝访问|permission denied/i.test(detail)) return 'Codex 数据目录不可访问，请使用当前 Windows 用户启动，检查 CODEX_HOME 目录权限后重新连接。'
@@ -71,13 +73,15 @@ export async function codexLaunch({ env = process.env, platform = process.platfo
 export class DeviceCodex extends EventEmitter {
   constructor({ launch = codexLaunch, spawnProcess = spawn, approve = async () => ({ decision: 'decline' }),
     onActivity = () => {}, onReport = () => {}, log, requestMs = 30000, retryMs = 3000, monitorMs = 3000, externalStaleMs = 10 * 60000, monitorScope = () => undefined,
-    rolloutReader = new CodexRolloutReader() } = {}) {
+    rolloutReader = new CodexRolloutReader(), queueMessage = queueCodexMessage } = {}) {
     super()
     Object.assign(this, { launch, spawnProcess, approve, onActivity, onReport, log, requestMs })
     Object.assign(this, { retryMs, monitorMs, monitorScope, externalStaleMs })
     this.rolloutReader = rolloutReader
+    this.queueMessage = queueMessage
     this.status = 'disconnected'; this.message = ''; this.cwd = ''; this.tasks = new Map()
     this.pending = new Map(); this.approvals = new Map(); this.nextId = 0; this.generation = 0
+    this.continuations = new Set()
     this.monitorStartedAt = Date.now(); this.monitorCursor = null; this.monitorBaseline = true
   }
   snapshot() {
@@ -86,7 +90,7 @@ export class DeviceCodex extends EventEmitter {
       monitorStatus: this.status !== 'ready' ? 'offline' : this.monitorError ? 'error' : this.lastMonitorAt ? 'ready' : 'pending',
       monitorError: this.monitorError || '', lastMonitorAt: this.lastMonitorAt || null,
       tasks: [...this.tasks.values()].sort((a, b) => Number(a.status === 'inProgress') - Number(b.status === 'inProgress') || a.updatedAt - b.updatedAt).slice(-100)
-        .map(({ scope, instruction, hydrating, rolloutPath, ...task }) => ({ ...task, records: task.records.map(row => ({ ...row })) })) }
+        .map(({ scope, instruction, hydrating, rolloutPath, continuationPending, continuationUncertain, continuationBaseTurnId, managedTurnId, ...task }) => ({ ...task, records: task.records.map(row => ({ ...row })) })) }
   }
   publish() { this.emit('state', this.snapshot()) }
   record(task, kind, text, id = `${Date.now()}-${++this.nextId}`, append = false) {
@@ -141,6 +145,7 @@ export class DeviceCodex extends EventEmitter {
     const generation = ++this.generation
     const launch = await this.launch()
     if (generation !== this.generation) throw fail('连接已取消')
+    this.launchSpec = launch
     this.log?.event('codex.launch', { command: launch.command })
     const child = this.child = this.spawnProcess(launch.command, launch.args, {
       cwd: launch.cwd || homedir(), env: launch.env || process.env, windowsHide: true,
@@ -219,7 +224,8 @@ export class DeviceCodex extends EventEmitter {
   }
   async serverRequest({ id, method, params = {} }) {
     const task = this.tasks.get(params.threadId), child = this.child
-    if (!task || task.external || task.status !== 'inProgress' || params.turnId && task.turnId && params.turnId !== task.turnId) {
+    if (!task || task.external && (!params.turnId || task.managedTurnId !== params.turnId) ||
+        task.status !== 'inProgress' || params.turnId && task.turnId && params.turnId !== task.turnId) {
       try { this.write({ id, error: { code: -32601, message: 'Unmanaged request' } }) } catch {}
       return
     }
@@ -250,7 +256,9 @@ export class DeviceCodex extends EventEmitter {
     }
     task.eventRevision = (task.eventRevision || 0) + 1
     if (method === 'turn/started') {
-      if (expectedTurn !== params.turn.id) { task.result = ''; task.records = []; task.reportAt = 0; task.currentRequest = expectedTurn ? '' : task.currentRequest || '' }
+      if (task.continuationPending) task.managedTurnId = params.turn.id
+      else if (task.managedTurnId !== params.turn.id) task.managedTurnId = ''
+      if (expectedTurn !== params.turn.id) { task.result = ''; task.records = []; task.reportAt = 0; task.currentRequest = expectedTurn && !task.continuationPending ? '' : task.currentRequest || '' }
       task.turnId = params.turn.id; task.lastTurnId = params.turn.id; task.status = 'inProgress'; task.syncError = ''; this.publish()
     }
     else if (method === 'turn/plan/updated') {
@@ -285,8 +293,13 @@ export class DeviceCodex extends EventEmitter {
       }
     } else if (method === 'error') this.record(task, 'error', '任务出现错误，请在 Codex 中检查账号额度、网络或执行权限。')
   }
-  async create(prompt, cwd = this.cwd, { signal = new AbortController().signal, scope } = {}) {
-    signal.throwIfAborted()
+  async create(prompt, cwd = this.cwd, { signal = new AbortController().signal, scope, isCurrent = () => true } = {}) {
+    const generation = this.generation
+    const check = () => {
+      signal.throwIfAborted()
+      if (generation !== this.generation || !isCurrent()) throw fail('任务上下文已变化，请核对任务列表；本次未自动重建。')
+    }
+    check()
     if (this.status !== 'ready') throw fail('请先在插件中心连接 Codex。')
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 6000) throw fail('请输入 1-6000 字的任务内容。')
     if (!cwd || !path.isAbsolute(cwd) || !(await stat(cwd)).isDirectory()) throw fail('请先选择可用的任务项目文件夹。')
@@ -295,14 +308,17 @@ export class DeviceCodex extends EventEmitter {
       if (!finished) throw fail('已有 20 个任务在运行，请先等待或停止部分任务。')
       this.tasks.delete(finished.id)
     }
+    check()
     const { thread } = await this.request('thread/start', { cwd, approvalPolicy: 'on-request', sandbox: 'workspace-write' })
-    signal.throwIfAborted()
+    check()
     const task = { id: thread.id, title: clean(thread.name || prompt.trim(), 100), currentRequest: clean(prompt.trim(), 1200), instruction:prompt.trim(), scope, cwd, status: 'inProgress', turnId: '', records: [], result: '', updatedAt: Date.now() }
     this.tasks.set(task.id, task)
     this.record(task, 'status', `已创建：${task.title}`, 'status')
     this.onReport({ id: task.id, scope:task.scope, eventId: `codex:${task.id}:created`, progress: true, text: `Harness 已向 Codex 创建任务：${task.title}` })
     try {
+      check()
       const { turn } = await this.request('turn/start', { threadId: task.id, input: [{ type: 'text', text: prompt.trim() }] })
+      check()
       this.log?.event('codex.turn-started', { taskId: task.id, turnId: turn.id })
       if (task.status === 'inProgress') { task.turnId = turn.id; task.lastTurnId = turn.id }
       this.publish()
@@ -311,15 +327,79 @@ export class DeviceCodex extends EventEmitter {
     }
     return { ok: true, taskId: task.id, message: `Codex 已接收任务：${task.title}` }
   }
+  async continue(taskId, prompt, { signal = new AbortController().signal, scope, isCurrent = () => true, queueWhileActive = false } = {}) {
+    const generation = this.generation
+    const check = () => {
+      signal.throwIfAborted()
+      if (generation !== this.generation || !isCurrent()) throw fail('任务上下文已变化，请重新发送。')
+    }
+    check()
+    if (this.status !== 'ready') throw fail('请先在插件中心连接 Codex。')
+    if (typeof taskId !== 'string' || !taskId || taskId.length > 256 || /[\x00-\x1f]/.test(taskId)) throw fail('请使用实际任务编号继续任务。')
+    const task = this.tasks.get(taskId)
+    if (!task) throw fail('未找到要继续的 Codex 任务，请先查询任务。')
+    if (this.continuations.has(taskId)) throw fail('正在提交该任务，请勿重复发送。')
+    if (task.status === 'inProgress' && !task.external && !queueWhileActive) throw fail('该 Codex 任务仍在执行，请等待本轮结束。')
+    if (task.continuationUncertain || !['completed', 'failed', 'interrupted', ...(task.external || queueWhileActive ? ['inProgress'] : [])].includes(task.status)) throw fail('任务状态尚未确认，请到 Codex 原窗口核对后再继续。')
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 2000) throw fail('请输入 1-2000 字的任务内容。')
+    this.continuations.add(taskId)
+    let submitted = false
+    try {
+      if (!task.cwd || !path.isAbsolute(task.cwd) || !(await stat(task.cwd)).isDirectory()) throw fail('任务项目不可访问，请检查原项目文件夹。')
+      check()
+      if (task.external || queueWhileActive && task.status === 'inProgress') {
+        task.continuationBaseTurnId = task.lastTurnId || task.turnId || ''
+        await this.queueMessage({ launch: this.launchSpec, threadId: taskId, text: prompt.trim(), signal })
+        submitted = true
+        check()
+        this.log?.event('codex.message-queued', { taskId, status: 'queued' })
+        return { ok: true, provider: 'codex', taskId, status: 'queued',
+          message: `已排队发送到原 Codex 会话：${task.title}，等待原窗口接收。` }
+      }
+      const { thread } = await this.request('thread/resume', { threadId: taskId, excludeTurns: true })
+      check()
+      if (thread?.id !== taskId) throw fail('Codex 返回的任务编号不匹配。')
+      if (this.tasks.get(taskId) !== task) throw fail('任务上下文已变化，请重新发送。')
+      if (thread.status?.type === 'active' || thread.turns?.some(turn => turn.status === 'inProgress') || task.status === 'inProgress') throw fail('该 Codex 任务仍在执行，请等待本轮结束。')
+      task.continuationBaseTurnId = task.lastTurnId || task.turnId || ''
+      task.instruction = `${task.currentRequest || task.title}\n用户后续要求：${prompt.trim()}`.slice(0, 6000)
+      task.currentRequest = prompt.trim(); task.scope = scope
+      task.continuationPending = true; task.status = 'inProgress'; task.turnId = ''
+      task.result = ''; task.records = []; task.reportAt = 0
+      task.eventRevision = (task.eventRevision || 0) + 1
+      submitted = true
+      const { turn } = await this.request('turn/start', { threadId: taskId, input: [{ type: 'text', text: prompt.trim() }] })
+      if (!turn?.id || typeof turn.id !== 'string') throw fail('Codex 续接结果无效。')
+      check()
+      if (task.lastTurnId !== turn.id) this.accept('turn/started', { threadId: taskId, turn })
+      task.managedTurnId = turn.id
+      this.log?.event('codex.turn-continued', { taskId, turnId: turn.id })
+      this.publish()
+      return { ok: true, provider: 'codex', taskId, turnId: turn.id, status: 'accepted', message: `已发送到原 Codex 会话：${task.title}，等待本轮执行结果。` }
+    } catch (error) {
+      if (submitted || error.submissionUncertain) {
+        task.status = 'unknown'; task.continuationUncertain = true
+        task.syncError = '续接提交结果尚未确认，请在 Codex 原窗口核对；不要重复发送。'
+        this.publish()
+        throw fail(task.syncError)
+      }
+      throw error
+    } finally {
+      task.continuationPending = false
+      this.continuations.delete(taskId)
+    }
+  }
   async refresh(selected = [...this.tasks.values()]) {
     if (this.status !== 'ready') return this.snapshot()
     const generation = this.generation
     const readTask = async task => {
+      if (this.continuations.has(task.id)) return
       const revision = task.eventRevision || 0
       try {
-        const observation = task.external && task.rolloutPath ? await this.rolloutReader.read({ id: task.id, file: task.rolloutPath }) : null
+        const useRollout = task.external && task.rolloutPath && !task.managedTurnId
+        const observation = useRollout ? await this.rolloutReader.read({ id: task.id, file: task.rolloutPath }) : null
         if (generation !== this.generation || revision !== (task.eventRevision || 0)) return
-        if (task.external && task.rolloutPath && !observation) {
+        if (useRollout && !observation) {
           task.status = 'unknown'; task.result = ''; task.syncError = '最新运行记录尚未确认，不播报历史结果'; task.checkedAt = Date.now(); return
         }
         const { data } = observation ? { data: [{ id: observation.turnId, status: observation.status }] }
@@ -328,11 +408,16 @@ export class DeviceCodex extends EventEmitter {
         const turn = data?.[0]
         if (turn) {
           if (typeof turn.id !== 'string' || !['inProgress', 'completed', 'failed', 'interrupted'].includes(turn.status)) throw fail('任务状态格式不兼容')
-          if (task.external && turn.status === 'inProgress' && task.runtimeStatus !== 'active' &&
+          if (task.continuationUncertain) {
+            if (turn.id === task.continuationBaseTurnId) { task.status = 'unknown'; task.result = ''; return }
+            task.continuationUncertain = false
+          }
+          if (task.managedTurnId && task.managedTurnId !== turn.id) task.managedTurnId = ''
+          if (task.external && !task.managedTurnId && turn.status === 'inProgress' && task.runtimeStatus !== 'active' &&
               Number.isFinite(Number(observation?.modifiedAt ?? Number(task.observedAt) * 1000)) && Date.now() - Number(observation?.modifiedAt ?? Number(task.observedAt) * 1000) > this.externalStaleMs) {
             task.status = 'unknown'; task.result = ''; task.syncError = '运行记录较旧，无法确认当前仍在执行，请到 Codex 原窗口核对'; task.checkedAt = Date.now(); return
           }
-          if (task.external && !observation && turn.status === 'interrupted') {
+          if (task.external && !task.managedTurnId && !observation && turn.status === 'interrupted') {
             task.status = 'unknown'; task.result = ''; task.syncError = '外部任务中断状态尚未核实，请到 Codex 原窗口核对'; task.checkedAt = Date.now(); return
           }
           const items = observation ? { data: [...observation.items].reverse() }
@@ -441,13 +526,14 @@ export class DeviceCodex extends EventEmitter {
   }
   async interrupt(taskId) {
     const task = this.tasks.get(taskId)
-    if (task?.external) throw fail('这个任务由其他 Codex 窗口创建，请回到原窗口停止。')
+    if (task?.external && (!task.managedTurnId || task.managedTurnId !== task.turnId)) throw fail('这个任务由其他 Codex 窗口创建，请回到原窗口停止。')
     if (!task?.turnId || task.status !== 'inProgress') throw fail('这个任务没有正在运行的轮次。')
     await this.request('turn/interrupt', { threadId: task.id, turnId: task.turnId })
     return { ok: true, message: '已请求停止 Codex 任务' }
   }
   async execute(args) {
     if (args?.operation === 'create') return this.create(args.prompt)
+    if (args?.operation === 'continue') return this.continue(args.taskId, args.task ?? args.prompt)
     if (args?.operation === 'status') return { ok: true, tasks: (await this.refresh()).tasks.map(({ id, title, status, result }) => ({ id, title, status, result })) }
     if (args?.operation === 'interrupt') return this.interrupt(args.taskId)
     throw fail('不支持的 Codex 任务操作')
@@ -462,6 +548,7 @@ export class DeviceCodex extends EventEmitter {
     this.monitorJob = null
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(fail(message)) }
     this.pending.clear(); this.cancelApprovals()
+    for (const task of this.tasks.values()) { task.continuationPending = false; task.managedTurnId = '' }
     for (const task of this.tasks.values()) if (task.status === 'inProgress') task.status = 'unknown'
     this.status = status; this.message = message; this.publish()
     if (status === 'error') this.scheduleReconnect()

@@ -1,14 +1,62 @@
 import { readFile, writeFile, rename, stat, readdir, realpath, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { fileTaskKind } from './device-task-intent.mjs'
+import { fileTaskKind, isCodexStatusCommand } from './device-task-intent.mjs'
+import { RemoteCodexChat } from './device-codex-remote.mjs'
+import { RemoteTools } from './device-remote-tools.mjs'
+
+const scopeKey = value => JSON.stringify([value?.deviceId, value?.owner, value?.tenantId, value?.agentId, value?.bound])
 
 // One application-owned Harness scheduler; providers never receive arbitrary RPC
 // methods, commands, credentials or directories supplied by a model.
 export class HarnessTaskDispatcher {
-  constructor({ assistant, codex, workbuddy, file, workspaceRoots = [], context = () => null, onActivity = () => {}, onCreated = () => {}, onCompleted = () => {} }) {
+  constructor({ assistant, codex, workbuddy, file, workspaceRoots = [], context = () => null, onActivity = () => {}, onCreated = () => {}, onCompleted = () => {},
+    remoteStatuses, beforeRemoteSend }) {
     Object.assign(this, { assistant, codex, workbuddy, file, workspaceRoots, context, onActivity, onCreated, onCompleted })
     this.projects = { codex: '', workbuddy: '' }; this.saving = Promise.resolve()
+    this.reportedTasks = new Map()
+    this.reportGeneration = 0
+    this.remote = new RemoteCodexChat({ codex, context, projects: () => this.availableProjects(),
+      project: () => this.projects.codex || this.codex?.cwd || '' })
+    this.tools = new RemoteTools({ codex, codexChat: this.remote, context, settings: assistant?.settings,
+      assistant, workbuddy, statuses: remoteStatuses, beforeSend: beforeRemoteSend,
+      project: () => this.projects.workbuddy || workbuddy?.cwd || '' })
+  }
+  sendRemote(text, options) {
+    this.continuationTasks()
+    return options?.target ? this.tools.send(text, options) : this.remote.send(text, options)
+  }
+  clearReports() {
+    const scope = scopeKey(this.context())
+    if (this.reportScope !== scope) { this.remote.clear(); this.tools.clear() }
+    this.reportedTasks.clear(); this.reportScope = scope; this.reportGeneration++
+  }
+  continuationTasks() {
+    if (this.reportScope !== scopeKey(this.context())) this.clearReports()
+    return [...this.reportedTasks.values()].filter(row => {
+      const task = this.codex?.tasks.get(row.id)
+      return task && (task.lastTurnId || task.turnId) === row.turnId
+    }).map(row => {
+      const task = this.codex.tasks.get(row.id)
+      return { id: row.id, title: task.title, status: task.status }
+    })
+  }
+  rememberReport(provider, value) {
+    this.continuationTasks()
+    if (provider !== 'codex' || !value.id || !value.turnId || !value.scope || scopeKey(value.scope) !== this.reportScope) return
+    this.reportedTasks.set(value.id, { id: value.id, turnId: value.turnId })
+    if (this.reportedTasks.size > 100) this.reportedTasks.delete(this.reportedTasks.keys().next().value)
+  }
+  continuationRoute(text) {
+    if (typeof text !== 'string' || !/^(?:(?:请|帮我|麻烦你)\s*)?(?:让\s*)?(?:codex\s*)?(?:继续|接着)(?:执行|处理|做|当前任务|刚才的任务|任务|吧|下去|一下|工作|完成|\s)*(?:（[^（）\r\n]{1,80}）|\([^()\r\n]{1,80}\))?[。.!！]*$/i.test(text.trim())) return null
+    const tasks = this.continuationTasks()
+    if (!tasks.length) return /codex/i.test(text) ? { decision: 'clarify', message: '当前没有可确定的 Codex 任务，请先查询并明确要继续的任务。' } : null
+    if (tasks.length > 1) return { decision: 'clarify', message: `当前有多个 Codex 任务，请明确要继续哪一个：${tasks.slice(0, 5).map(task => task.title.slice(0, 40)).join('、')}` }
+    return { decision: 'task', provider: 'codex', operation: 'continue', task: text.trim(), taskId: tasks[0].id }
+  }
+  directRoute(text) {
+    return isCodexStatusCommand(text) ? { decision: 'task', provider: 'codex', operation: 'status', task: text.trim() }
+      : this.continuationRoute(text)
   }
   async load() {
     try {
@@ -61,7 +109,8 @@ export class HarnessTaskDispatcher {
     const delegated = typeof task === 'string' && task.match(/(?:让|请|交给|调用|使用|用|通过|安排|ask\s+|use\s+|delegate\s+to\s+)(?:一下\s*)?\s*(work\s*buddy|codex)\b/i)
     if (provider === 'desktop' && delegated) provider = /codex/i.test(delegated[1]) ? 'codex' : 'workbuddy'
     const operation = args.operation || 'create'
-    if (!['desktop', 'codex', 'workbuddy'].includes(provider) || !['create', 'status', 'interrupt', 'projects'].includes(operation)) throw new Error('Harness 不支持这个任务操作')
+    if (!['desktop', 'codex', 'workbuddy'].includes(provider) || !['create', 'continue', 'status', 'interrupt', 'projects'].includes(operation) ||
+        operation === 'continue' && provider !== 'codex') throw new Error('Harness 不支持这个任务操作')
     if (operation === 'projects') return { ok: true, projects: await this.availableProjects() }
     if (provider === 'desktop') {
       if (operation !== 'create') throw new Error('电脑任务请使用停止回复按钮取消')
@@ -81,11 +130,22 @@ export class HarnessTaskDispatcher {
       return { ok: true, result }
     }
     const client = this[provider], label = provider === 'codex' ? 'Codex' : 'WorkBuddy'
-    if (operation === 'create' && (typeof task !== 'string' || !task.trim() || task.length > 2000)) throw new Error('请输入 1-2000 字的任务内容')
+    if (['create', 'continue'].includes(operation) && (typeof task !== 'string' || !task.trim() || task.length > 2000)) throw new Error('请输入 1-2000 字的任务内容')
     if (operation === 'interrupt' && (typeof args.taskId !== 'string' || !args.taskId || args.taskId.length > 256)) throw new Error('请先查询任务，使用实际任务编号停止任务')
-    this.onActivity({ source: 'Harness', kind: 'status', text: `正在调度 ${label}：${{ create: '创建任务', status: '查询进度', interrupt: '停止任务' }[operation]}`, key: `dispatch:${provider}` })
+    const scope = this.context(), expectedScope = scopeKey(scope)
+    this.onActivity({ source: 'Harness', kind: 'status', text: `正在调度 ${label}：${{ create: '创建任务', continue: '继续原任务', status: '查询进度', interrupt: '停止任务' }[operation]}`, key: `dispatch:${provider}` })
     if (provider === 'codex') await client.connect()
     signal.throwIfAborted()
+    if (operation === 'continue') {
+      if (scopeKey(this.context()) !== expectedScope) throw new Error('任务上下文已变化，请重新发送')
+      const tasks = this.continuationTasks()
+      if (!args.taskId && tasks.length > 1) throw new Error('当前有多个 Codex 任务，请明确要继续哪个任务')
+      const selected = args.taskId ? tasks.find(task => task.id === args.taskId) : tasks[0]
+      if (!selected) throw new Error('未找到当前对话已汇报的 Codex 任务，请先查询并明确目标')
+      const generation = this.reportGeneration
+      return client.continue(selected.id, task, { signal, scope,
+        isCurrent: () => this.reportGeneration === generation && scopeKey(this.context()) === expectedScope })
+    }
     if (operation === 'create') {
       const projects = await this.availableProjects()
       const workspace = args.workspace || projects.find(project => project.path === client.cwd)?.path || projects[0]?.path
@@ -107,11 +167,22 @@ export class HarnessTaskDispatcher {
     const value = provider === 'codex' ? await client.refresh() : client.snapshot()
     const tasks = value.tasks.slice(-100).reverse().sort((a,b)=>Number(b.status==='inProgress')-Number(a.status==='inProgress'))
       .filter(row=>!args.taskId || row.id===args.taskId)
-      .map(({ id, title, status, result, syncError, checkedAt, currentRequest, lastTurnId, turnId }) =>
+      .map(({ id, title, status, result, syncError, checkedAt, currentRequest, lastTurnId, turnId, updatedAt }) =>
         ({ id, title, status, currentRequest, turnId:lastTurnId || turnId,
-          result: status === 'unknown' ? '' : result?.slice(0, 400), syncError, checkedAt }))
+          result: status === 'unknown' ? '' : result?.slice(0, 400), syncError, checkedAt, updatedAt }))
+    const currentTasks = tasks.filter(row => row.status === 'inProgress')
+    const latest = Math.max(...tasks.map(row => row.updatedAt || 0))
+    const targets = currentTasks.length ? currentTasks : tasks.filter(row => (row.updatedAt || 0) === latest)
+    // An explicit status query also establishes real targets after an app restart.
+    if (provider === 'codex' && scopeKey(this.context()) === expectedScope) {
+      this.clearReports()
+      for (const task of targets) this.rememberReport(provider, { ...task, scope })
+    }
+    const statuses = { inProgress: '正在执行', completed: '本轮已完成', failed: '失败', interrupted: '已中断', unknown: '状态未确认', idle: '尚未读取轮次' }
+    const message = !tasks.length ? 'Codex 查询结果：暂未发现任务，不能据此确认所有任务均已结束。'
+      : `Codex 查询结果：${currentTasks.length ? `有 ${currentTasks.length} 个任务正在执行` : tasks.some(row => ['unknown', 'idle'].includes(row.status)) ? '部分任务状态尚未确认' : '未发现正在执行的任务'}。\n${targets.slice(0, 5).map(row => `${row.title}（${statuses[row.status] || '状态未确认'}）`).join('\n')}${targets.length === 1 && ['completed', 'failed', 'interrupted'].includes(targets[0].status) ? '\n发送“继续”将续接这个原会话。' : ''}`
     return { ok: true, provider, monitoring: value.monitorStatus, syncedAt: value.lastMonitorAt,
-      currentTasks:tasks.filter(row=>row.status==='inProgress'), tasks,
+      currentTasks, tasks, message,
       guidance:'currentTasks 才是本次已确认进行中的任务；tasks 同时包含历史记录。必须区分会话名称、本轮要求和本轮结果，不得把历史任务说成当前正在执行。unknown 表示无法确认。' }
   }
   async availableProjects() {

@@ -39,6 +39,7 @@ test('explicit operations route to Harness, while questions, negation and quotat
 })
 test('remote operations fail closed without server authentication while normal chat stays available', () => {
   assert.equal(remoteTaskAccess('打开微信', {}).code, 'REMOTE_AUTH_REQUIRED')
+  assert.equal(remoteTaskAccess('查询 codex 任务', {}).code, 'REMOTE_AUTH_REQUIRED')
   assert.deepEqual(remoteTaskAccess('你好', {}), { ok: true, allowComputer: false })
   assert.deepEqual(remoteTaskAccess('打开微信', { computerAuthorized: true }), { ok: true, allowComputer: true })
 })

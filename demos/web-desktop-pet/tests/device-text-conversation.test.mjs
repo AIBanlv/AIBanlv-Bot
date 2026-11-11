@@ -78,6 +78,18 @@ test('a question waits for durable local storage and cancellation prevents the p
   assert.equal((await pending).code, 'CANCELLED')
 })
 
+test('task dispatch errors expose a safe actionable reason instead of a model-key error', async () => {
+  const events = []
+  const chat = new DeviceTextConversation({ settings: { key: () => 'fixture-key' },
+    context: () => ({ agentId: 'role', persona: '测试角色' }), onEvent: value => events.push(value),
+    assistant: { enabled: () => true, planTask: async () => ({ decision: 'task', provider: 'codex', operation: 'continue', task: '继续' }),
+      dispatch: async () => { throw Object.assign(new Error('该 Codex 任务仍在执行，请等待本轮结束。'), { code: 'TASK_DISPATCH_FAILED' }) } } })
+  const result = await chat.chat('继续')
+  assert.equal(result.ok, false)
+  assert.match(result.message, /仍在执行/)
+  assert.match(events.find(row => row.type === 'error').message, /仍在执行/)
+})
+
 test('oversized provider response fails without displaying partial content', async () => {
   const events = []
   const chat = new DeviceTextConversation({ settings: { key: () => 'key' },

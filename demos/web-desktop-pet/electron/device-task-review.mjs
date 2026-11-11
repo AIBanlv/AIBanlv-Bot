@@ -6,7 +6,8 @@ const methods = new Set(['item/commandExecution/requestApproval', 'item/fileChan
 export async function reviewTaskRequest({ confirm, task, method, params, signal }) {
   const deny = method === 'item/tool/requestUserInput' ? { answers: {} }
     : method === 'item/permissions/requestApproval' ? { permissions: {}, scope: 'turn' } : { decision: 'decline' }
-  if (!methods.has(method) || typeof confirm !== 'function' || !task || task.external || !task.instruction || !task.cwd
+  if (!methods.has(method) || typeof confirm !== 'function' || !task ||
+    task.external && (!params?.turnId || task.managedTurnId !== params.turnId) || !task.instruction || !task.cwd
     || task.status && task.status !== 'inProgress' || signal?.aborted) return deny
   try {
     const request = structuredClone(params)

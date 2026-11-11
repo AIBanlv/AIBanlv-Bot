@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DeviceRealtime } from '../electron/device-realtime.mjs'
+import { AssistantService } from '../electron/device-assistant-service.mjs'
+import { HarnessTaskDispatcher } from '../electron/device-task-dispatcher.mjs'
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
 class Socket extends EventTarget {
@@ -149,4 +151,21 @@ test('later turns restore routing and get only recent same-connection context', 
   const updates = f.socket.sent.filter(row => row.type === 'session.update')
   assert.equal(updates.at(-2).session.tools.length, 1)
   assert.equal(updates.at(-1).session.tools.length, 0)
+})
+
+test('bound phone continuation reaches the same Codex task through the real Harness router and Realtime tool path', async t => {
+  const scope = { owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role', bound: true }
+  const calls = [], task = { id: 'reported', title: '原任务', status: 'completed', lastTurnId: 'old' }
+  const codex = { tasks: new Map([[task.id, task]]), connect: async () => {},
+    continue: async (id, text) => { calls.push({ id, text }); return { ok: true, taskId: id, turnId: 'new', status: 'accepted' } } }
+  const service = new AssistantService({ settings: { snapshot: () => ({ enabled: true }) }, root: 'fixture' })
+  const router = new HarnessTaskDispatcher({ assistant: service, codex, context: () => scope })
+  service.taskRouter = router
+  router.rememberReport('codex', { id: task.id, turnId: 'old', scope })
+  const f = fixture(t, { planTask: service.planTask.bind(service), dispatch: service.dispatch.bind(service) })
+  await f.start('继续', { remoteSessionId: 'phone-owner' })
+  assert.deepEqual(calls, [{ id: task.id, text: '继续' }])
+  const output = JSON.parse(f.socket.sent.find(row => row.item?.type === 'function_call_output').item.output)
+  assert.equal(output.taskId, task.id)
+  assert.equal(output.status, 'accepted')
 })

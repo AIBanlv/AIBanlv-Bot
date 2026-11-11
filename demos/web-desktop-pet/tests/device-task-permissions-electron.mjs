@@ -14,6 +14,10 @@ export async function verifyTaskPermissions({ app, root }) {
       const command = await approve('item/commandExecution/requestApproval', { command: 'fixture command; never executed' })
       const permissions = await approve('item/permissions/requestApproval', { permissions: { network: { enabled: true } } })
       const answers = await approve('item/tool/requestUserInput', { questions: [{ id: 'q', question: '继续？', options: [{ label: '继续' }] }] })
+      task.external = true; task.managedTurnId = 'continued-turn'
+      const continued = await approve('item/commandExecution/requestApproval', { turnId: 'continued-turn', command: 'continued fixture; never executed' })
+      const external = await approve('item/commandExecution/requestApproval', { turnId: 'old-turn', command: 'must not prompt' })
+      task.external = false
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [root] })
       const workspace = await client.authorizeTask('检查夹具目录', new AbortController().signal)
       dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] })
@@ -25,7 +29,7 @@ export async function verifyTaskPermissions({ app, root }) {
       let cancelled
       try { cancelled = await approve('item/commandExecution/requestApproval', { command: 'cancel-only fixture' }, controller.signal) }
       finally { clearTimeout(timer) }
-      return { command, permissions, answers, workspace, cancelledWorkspace, cancelled,
+      return { command, permissions, answers, continued, external, workspace, cancelledWorkspace, cancelled,
         dialogs: calls.map(({ defaultId, cancelId, detail, buttons }) => ({ defaultId, cancelId, detail, buttons })) }
     } finally {
       dialog.showMessageBox = originalMessage; dialog.showOpenDialog = originalOpen
@@ -35,9 +39,11 @@ export async function verifyTaskPermissions({ app, root }) {
   assert.deepEqual(result.command, { decision: 'accept' })
   assert.deepEqual(result.permissions, { permissions: { network: { enabled: true } }, scope: 'turn' })
   assert.deepEqual(result.answers, { answers: { q: { answers: ['继续'] } } })
+  assert.deepEqual(result.continued, { decision: 'accept' })
+  assert.deepEqual(result.external, { decision: 'decline' })
   assert.equal(result.workspace, root); assert.equal(result.cancelledWorkspace, '')
   assert.deepEqual(result.cancelled, { decision: 'decline' })
-  assert.equal(result.dialogs.length, 4)
+  assert.equal(result.dialogs.length, 5)
   assert.ok(result.dialogs.every(value => value.defaultId === 0 && value.cancelId === 0 && value.detail.includes(root)))
   assert.match(result.dialogs[0].detail, /fixture command; never executed/)
   return { localApproval: true, exactTurnPermissions: true, explicitWorkspace: true, nativeCancellation: true }

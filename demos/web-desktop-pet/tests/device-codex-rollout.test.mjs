@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, appendFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, appendFile, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { CodexRolloutReader } from '../electron/device-codex-rollout.mjs'
@@ -65,4 +65,22 @@ test('external interrupted status without original lifecycle evidence is unknown
   const reports=[],client=new DeviceCodex({onReport:value=>reports.push(value)});t.after(()=>client.shutdown());client.status='ready'
   client.request=async method=>method==='thread/list'?{data:[{id:'external',cwd:process.cwd(),updatedAt:Date.now()/1000}]}:{data:[{id:'live',status:'interrupted'}]}
   await client.monitorProject();assert.equal(client.tasks.get('external').status,'unknown');assert.deepEqual(reports,[])
+})
+
+test('fresh lifecycle and progress timestamps override a preserved old filesystem modification time', async t => {
+  const { id, file, reader } = await fixture(t)
+  await writeFile(file, line('event_msg', { type: 'task_started', turn_id: 'live' }) +
+    line('response_item', { type: 'message', role: 'assistant', phase: 'commentary',
+      content: [{ type: 'output_text', text: '当前仍在执行' }] }))
+  const old = new Date(Date.now() - 60 * 60000)
+  await utimes(file, old, old)
+  const client = new DeviceCodex({ rolloutReader: reader })
+  t.after(() => client.shutdown())
+  client.status = 'ready'
+  client.request = async method => {
+    assert.equal(method, 'thread/list')
+    return { data: [{ id, path: file, cwd: process.cwd(), updatedAt: old.getTime() / 1000, status: { type: 'notLoaded' } }] }
+  }
+  await client.monitorProject()
+  assert.equal(client.tasks.get(id).status, 'inProgress')
 })

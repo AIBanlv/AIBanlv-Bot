@@ -31,6 +31,21 @@ const profile = { type: 'switch_avatar', deviceId: 'zhanlv:desktop-test',
   agentId: 'role-a', agentName: 'Role A', voiceId: 'cosyvoice-custom-a',
   zipUrl: 'https://qn.ieasysell.com/role-a.zip', profileVersion: 2 }
 
+test('phone target metadata is allowlisted and cannot authorize itself', t => {
+  const { channel, socket } = fixture(t)
+  socket.message({ type: 'bind_success', deviceId: channel.state.deviceId, tenantId: 'tenant-a',
+    controllerUserId: 'user-a', capabilities: { directTransferV1: true } })
+  const received = []; channel.on('text', (...args) => received.push(args))
+  for (const remoteTarget of ['codex', 'deepseek', 'harness', 'workbuddy']) {
+    socket.message({ type: 'send_text', text: '普通问题', remoteTarget, requestId: remoteTarget })
+    assert.equal(received.at(-1)[2].remoteTarget, remoteTarget)
+    assert.equal(received.at(-1)[2].computerAuthorized, false)
+  }
+  socket.message({ type: 'send_text', text: '普通问题', remoteTarget: 'shell', requestId: 'invalid-tool' })
+  assert.equal(received.length, 4)
+  assert.equal(socket.sent.at(-1).code, 'INVALID_TOOL')
+})
+
 test('remote profiles cannot declare themselves local or bypass platform billing', t => {
   assert.equal(normalizeProfile({ ...profile, source: 'local' }).source, 'online')
   const { channel, socket } = fixture(t); bind(socket)
@@ -296,6 +311,17 @@ test('a history request only asks for a snapshot and never reaches the pet', t =
     requestId: 'sync', agentId: 'role-1' })
   assert.equal(texts.length, 0)
   assert.deepEqual(histories, [{ agentId: 'role-1', requestId: 'sync' }])
+})
+
+test('tool readiness refresh asks for a tools-only snapshot without starting a chat', t => {
+  const { channel, socket } = fixture(t)
+  const received = []
+  channel.on('text', () => assert.fail('readiness must not reach a model'))
+  channel.on('history', (...args) => received.push(args))
+  bind(socket)
+  socket.message({ type: 'send_text', deviceId: 'zhanlv:desktop-test', operation: 'sync_tools',
+    requestId: 'tools-sync', agentId: 'role-1' })
+  assert.deepEqual(received, [['role-1', 'tools-sync', { toolsOnly: true }]])
 })
 
 test('a stored history receipt is forwarded once the transcript row is durable', t => {

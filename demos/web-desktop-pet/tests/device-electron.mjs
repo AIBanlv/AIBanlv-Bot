@@ -14,6 +14,7 @@ import { verifyIdleExpressions } from './device-idle-electron.mjs'
 import { verifyControlErrors } from './device-control-errors-electron.mjs'
 import { verifyBoundText } from './device-bound-text-electron.mjs'
 import { verifyTaskPermissions } from './device-task-permissions-electron.mjs'
+import { verifyRemoteCodex } from './device-codex-remote-electron.mjs'
 import { showSettings } from './settings-navigation-fixture.mjs'
 const require = createRequire(import.meta.url)
 const root = process.cwd()
@@ -217,6 +218,18 @@ DeviceCodex.prototype.startAutoConnect = function () { globalThis.permissionCode
 const { HarnessClient } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'electron/device-harness-client.mjs')).href)})
 const startClient = HarnessClient.prototype.start
 HarnessClient.prototype.start = function (...args) { globalThis.permissionHarness = this; return startClient.apply(this, args) }
+const { DeviceChannel } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'electron/device-channel.mjs')).href)})
+const channelStart = DeviceChannel.prototype.start
+DeviceChannel.prototype.start = function (...args) { globalThis.permissionChannel = this; return channelStart.apply(this, args) }
+const { DeviceConversation } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'electron/device-conversation.mjs')).href)})
+const setContext = DeviceConversation.prototype.setContext
+DeviceConversation.prototype.setContext = function (...args) { globalThis.permissionConversation = this; return setContext.apply(this, args) }
+const { HarnessTaskDispatcher } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'electron/device-task-dispatcher.mjs')).href)})
+const loadDispatcher = HarnessTaskDispatcher.prototype.load
+HarnessTaskDispatcher.prototype.load = function (...args) { globalThis.permissionDispatcher = this; return loadDispatcher.apply(this, args) }
+const { DeviceRemoteReplies } = await import(${JSON.stringify(pathToFileURL(path.join(root, 'electron/device-remote-replies.mjs')).href)})
+const submitReply = DeviceRemoteReplies.prototype.submit
+DeviceRemoteReplies.prototype.submit = function (...args) { globalThis.permissionReplies = this; return submitReply.apply(this, args) }
 ` : ''}
 await import(${JSON.stringify(pathToFileURL(process.env.DEVICE_MAIN_ENTRY || path.join(root, 'electron/device-main.mjs')).href)})
 `)
@@ -329,6 +342,7 @@ try {
     // Permissions need the real main-process wiring and native dialogs, but no
     // avatar, inference, account or paid model session.
     report.permissions = await verifyTaskPermissions({ app, root })
+    report.remoteCodex = await verifyRemoteCodex({ app })
     assert.equal(providerConfigs.length, 0)
     const closed = app.waitForEvent('close', { timeout: 10000 })
     await app.evaluate(({ app }) => app.quit()); await closed; appClosed = true

@@ -35,6 +35,7 @@ export class CodexRolloutReader {
         for (const line of lines) {
           let row; try { row = JSON.parse(line) } catch { continue }
           const p = row.payload || {}, at = Date.parse(row.timestamp)
+          if (Number.isFinite(at) && at <= Date.now() + 60000) cached.lastWrittenAt = Math.max(cached.lastWrittenAt || 0, at)
           if (row.type === 'event_msg' && p.type === 'task_started' && typeof p.turn_id === 'string') {
             cached.state = { turnId: p.turn_id, status: 'inProgress', items: [], startedAt: at }
           } else if (row.type === 'event_msg' && ['task_complete','turn_aborted'].includes(p.type) && typeof p.turn_id === 'string') {
@@ -61,7 +62,7 @@ export class CodexRolloutReader {
       }
       this.cache.delete(resolved); this.cache.set(resolved, cached)
       while (this.cache.size > 128) this.cache.delete(this.cache.keys().next().value)
-      return cached.state ? { ...cached.state, items: cached.state.items.map(item => ({ ...item })), modifiedAt: info.mtimeMs } : null
+      return cached.state ? { ...cached.state, items: cached.state.items.map(item => ({ ...item })), modifiedAt: Math.max(info.mtimeMs, cached.lastWrittenAt || 0) } : null
     } catch { return null }
     finally { await handle?.close() }
   }

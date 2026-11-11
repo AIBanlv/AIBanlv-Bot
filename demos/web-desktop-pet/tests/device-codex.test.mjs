@@ -300,3 +300,109 @@ test('completion keeps its turn identity even when the started event was missed'
   assert.equal(client.tasks.get('thread').lastTurnId,'actual-turn')
   assert.equal(reports[0].turnId,'actual-turn')
 })
+
+test('continuing a companion-owned thread keeps its history and handles only the new turn approvals', async t => {
+  const approvals = [], reports = []
+  const client = new DeviceCodex({ launch: async () => ({ command: process.execPath, args: [fixture] }),
+    onReport: value => reports.push(value), approve: async value => { approvals.push(value); return { decision: 'accept' } } })
+  t.after(() => client.shutdown())
+  await client.connect()
+  const original = await client.request('thread/start', { cwd })
+  const { thread } = original
+  client.tasks.set(thread.id, { id: thread.id, title: '伴侣创建的任务', cwd, external: false,
+    status: 'completed', lastTurnId: 'previous', records: [], result: '上轮结果' })
+  const result = await client.continue(thread.id, '继续检查剩余测试', { scope: { owner: 'phone-owner' } })
+  await until(() => client.tasks.get(thread.id).status === 'completed')
+  assert.equal(result.taskId, thread.id)
+  assert.ok(result.turnId)
+  assert.equal((await client.request('thread/list', {})).data.length, 1)
+  assert.equal(approvals.length, 1)
+  assert.equal(approvals[0].params.turnId, result.turnId)
+  assert.equal(client.tasks.get(thread.id).external, false)
+  assert.equal(client.tasks.get(thread.id).currentRequest, '继续检查剩余测试')
+  assert.deepEqual(reports.find(row => row.progress === false).scope, { owner: 'phone-owner' })
+})
+
+test('continuation refuses active, unknown and concurrent submissions without starting a second turn', async t => {
+  const client = new DeviceCodex()
+  t.after(() => client.shutdown()); client.status = 'ready'
+  const task = { id: 'thread', cwd, title: '任务', status: 'inProgress', turnId: 'active', records: [] }
+  client.tasks.set(task.id, task)
+  let starts = 0, release
+  client.request = async method => {
+    if (method === 'thread/resume') return await new Promise(resolve => { release = resolve })
+    if (method === 'turn/start') { starts++; return { turn: { id: 'next' } } }
+    assert.fail(method)
+  }
+  await assert.rejects(client.continue(task.id, '继续'), /仍在执行/)
+  task.status = 'unknown'
+  await assert.rejects(client.continue(task.id, '继续'), /确认/)
+  task.status = 'completed'; task.turnId = ''
+  const first = client.continue(task.id, '继续')
+  await until(() => release)
+  await assert.rejects(client.continue(task.id, '继续'), /提交/)
+  release({ thread: { id: task.id, cwd, status: { type: 'idle' } } })
+  await first
+  assert.equal(starts, 1)
+})
+
+test('context loss after resume and a live active thread never submit continuation input', async t => {
+  for (const active of [false, true]) {
+    let current = true
+    const client = new DeviceCodex(); t.after(() => client.shutdown()); client.status = 'ready'
+    client.tasks.set('thread', { id: 'thread', cwd, title: '任务', status: 'completed', records: [] })
+    client.request = async method => {
+      assert.equal(method, 'thread/resume')
+      if (!active) current = false
+      return { thread: { id: 'thread', cwd, status: { type: active ? 'active' : 'idle' } } }
+    }
+    await assert.rejects(client.continue('thread', '继续', { isCurrent: () => current }), active ? /仍在执行/ : /变化/)
+  }
+})
+
+test('an uncertain continuation is not automatically resubmitted', async t => {
+  const client = new DeviceCodex(); t.after(() => client.shutdown()); client.status = 'ready'
+  client.tasks.set('thread', { id: 'thread', cwd, title: '任务', status: 'completed', lastTurnId: 'old', records: [] })
+  let starts = 0
+  client.request = async method => {
+    if (method === 'thread/resume') return { thread: { id: 'thread', cwd, status: { type: 'idle' } } }
+    if (method === 'turn/start') { starts++; throw new Error('response lost') }
+    return { data: method === 'thread/turns/list' ? [{ id: 'old', status: 'completed' }] : [] }
+  }
+  await assert.rejects(client.continue('thread', '继续'), /确认/)
+  await client.refresh()
+  await assert.rejects(client.continue('thread', '继续'), /确认/)
+  assert.equal(starts, 1)
+})
+
+test('continued turns poll the live server instead of a stale external rollout and retain interrupt authority', async t => {
+  const client = new DeviceCodex({ rolloutReader: { read: async () => assert.fail('old rollout must not replace the managed turn') } })
+  t.after(() => client.shutdown()); client.status = 'ready'
+  const task = { id: 'thread', cwd, title: '任务', external: true, rolloutPath: '/old',
+    managedTurnId: 'continued', status: 'inProgress', turnId: 'continued', lastTurnId: 'continued', observedAt: 1, records: [] }
+  client.tasks.set(task.id, task)
+  client.request = async method => {
+    if (method === 'thread/turns/list') return { data: [{ id: 'continued', status: 'inProgress' }] }
+    if (method === 'thread/items/list') return { data: [] }
+    assert.equal(method, 'turn/interrupt')
+    return {}
+  }
+  await client.refresh()
+  assert.equal(task.status, 'inProgress')
+  assert.equal((await client.interrupt(task.id)).ok, true)
+  client.accept('turn/started', { threadId: task.id, turn: { id: 'other-window' } })
+  await assert.rejects(client.interrupt(task.id), /原窗口/)
+})
+
+test('remote task creation rechecks context after thread allocation and never starts a turn for a lost binding', async t => {
+  let current = true
+  const client = new DeviceCodex()
+  t.after(() => client.shutdown()); client.status = 'ready'
+  client.request = async method => {
+    assert.equal(method, 'thread/start')
+    current = false
+    return { thread: { id: 'allocated-only' } }
+  }
+  await assert.rejects(client.create('检查项目', cwd, { isCurrent: () => current }), /上下文/)
+  assert.equal(client.tasks.size, 0)
+})

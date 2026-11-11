@@ -238,9 +238,15 @@ export class AssistantService {
     ]))
   }
   async planTask(text, { signal, context = [] } = {}) {
+    signal?.throwIfAborted()
     if (!this.enabled()) throw assistantError('ASSISTANT_DISABLED')
+    const continuation = this.taskRouter?.continuationRoute(text)
+    if (continuation) return validateTaskRoute(continuation)
+    const prompt = routingPrompt(text, context, this.taskRouter?.continuationTasks())
     if (this.client?.ready()) {
-      const raw = await this.clientText(routingPrompt(text, context), signal)
+      const raw = await this.clientText(prompt, signal)
+      signal?.throwIfAborted()
+      if (!this.enabled()) throw assistantError('ASSISTANT_DISABLED')
       return validateTaskRoute(JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')))
     }
     if (!this.planner) {
@@ -250,7 +256,7 @@ export class AssistantService {
       this.planner.execute = async () => { throw assistantError('ACTION_DENIED') }
     }
     const timeout = AbortSignal.timeout(20000)
-    const raw = await this.planner.run(routingPrompt(text, context), {
+    const raw = await this.planner.run(prompt, {
       signal: AbortSignal.any([...(signal ? [signal] : []), timeout]) })
     signal?.throwIfAborted()
     if (!this.enabled()) throw assistantError('ASSISTANT_DISABLED')

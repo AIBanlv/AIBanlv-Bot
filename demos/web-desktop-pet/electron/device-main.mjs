@@ -19,7 +19,7 @@ import { chatInputResult, deviceInputResult, platformCreditsMessage, guestCredit
 import { microphonePermission } from './device-media-policy.mjs'
 import { createDeviceSession } from './device-session.mjs'
 import { DeviceRealtime } from './device-realtime.mjs'
-import { remoteTaskAccess } from './device-task-intent.mjs'
+import { remoteTaskAccess, remoteCodexInput } from './device-task-intent.mjs'
 import { DeviceBilling } from './device-billing.mjs'
 import { DeviceLam } from './device-lam.mjs'
 import { createLamEngine } from './device-lam-engine.mjs'
@@ -28,7 +28,7 @@ import { loadDisplayPreferences, saveDisplayPreferences } from './device-prefere
 import { AssistantSettings } from './device-assistant-policy.mjs'
 import { HarnessClient } from './device-harness-client.mjs'
 import { AssistantService, assistantMessage } from './device-assistant-service.mjs'
-import { AssistantLog } from './device-assistant-log.mjs'
+import { AssistantLog, redact } from './device-assistant-log.mjs'
 import { MailSettings } from './device-mail-settings.mjs'
 import { MailService, mailMessage, mailAnnouncement } from './device-mail-service.mjs'
 import { buildFaceBank } from './device-face-bank.mjs'
@@ -281,6 +281,7 @@ const publish = () => {
 }
 const syncConversation = () => {
   if (!conversation || !windows) return
+  taskDispatcher?.continuationTasks()
   const state = snapshot()
   // Memory belongs to a role inside its tenant, so the identity of the open
   // conversation has to include who is bound. Rebinding to another account with
@@ -614,7 +615,7 @@ async function start() {
       persona: runtime.state.current?.characterSetting || `你是${runtime.state.current?.agentName || '数字人'}。` }),
     getHistory: signal => restoreHistory(signal),
     onEvent: event => conversation.emit('event', { ...event, textOnly: true }) })
-  conversation = new DeviceConversation({ realtime, text, routing })
+  conversation = new DeviceConversation({ realtime, text, routing, tasks: () => taskDispatcher })
   const isolated = session.fromPartition('control-device')
   const mediaPermission = (contents, permission, details, check = false) => microphonePermission({
     contents, permission, details, check, expected: windows?.pet?.webContents, petUrl: `${origin}/device/device-pet.html`,
@@ -956,11 +957,13 @@ async function start() {
   ipcMain.on('device:rendered', (event, id, status) => {
     if (windows.fromPet(event) && typeof id === 'string' && ['ready', 'error'].includes(status)) runtime.rendered(id, status)
   })
-  const chat = async (text, allowComputer = true, remoteSessionId = '') => {
+  const chat = async (text, allowComputer = true, remoteSessionId = '', remoteCodex = false, remoteTarget = '') => {
     if (conversationStore.failed) return { ok: false, code: 'HISTORY_STORAGE_UNAVAILABLE', message: memoryError }
+    const options = { allowComputer, remoteSessionId, remoteCodex, remoteTarget }
+    if (remoteCodexInput(text, options) || taskDispatcher?.directRoute(text)) return conversation.send(text, options)
     await refreshScore()
     const result = chatInputResult(text, snapshot())
-    return result.ok ? conversation.send(text, { allowComputer, remoteSessionId }) : result
+    return result.ok ? conversation.send(text, options) : result
   }
   ipcMain.handle('device:chat', (event, text) => windows.fromPet(event) && windows.state.visible
     ? chat(text) : { ok: false, code: 'FORBIDDEN', message: '请求来源无效' })
@@ -995,12 +998,16 @@ async function start() {
   // The durable transcript lives server-side; the device reports every turn it
   // speaks so the app can show the same conversation the machine just had.
   const remoteReplies = new DeviceRemoteReplies({ send: value => channel.send(value),
+    tools: () => taskDispatcher?.tools.catalog(),
     persist: (payload, context) => conversationStore.record(payload, context), onPersistError: storageFailure,
     // The control service has already verified the controller owns this binding.
-    // Mobile and local conversation commands share the same Harness tool path.
+    // Authenticated phone text uses Codex; local chat keeps its selected source.
     chat: (value, metadata) => {
       const access = remoteTaskAccess(value, metadata)
-      return access.ok ? chat(value, access.allowComputer, metadata?.originSessionId || '') : access
+      if (metadata?.remoteTarget && access.allowComputer !== true) return { ok: false, code: 'REMOTE_AUTH_REQUIRED', message: '手机远程操作尚未授权，请重新进入设备对话。' }
+      assistantLog.event('control.text-access', { computerAuthorized: metadata?.computerAuthorized === true, code: access.code || 'OK',
+        directTask: access.allowComputer === true || Boolean(taskDispatcher?.directRoute(value)), chars: value.length })
+      return access.ok ? chat(value, access.allowComputer, metadata?.originSessionId || '', access.allowComputer === true, metadata?.remoteTarget || '') : access
     }, context: () => ({ ...roleContext(), profileVersion: runtime.state.current?.profileVersion }) })
   conversation.on('event', event => remoteReplies.accept(event))
   let localTurn
@@ -1072,6 +1079,7 @@ async function start() {
       if(value.scope?.bound && (value.scope.owner!==channel.state.owner || value.scope.tenantId!==channel.tenantId))return
       if(eventId)taskReports.finalize(eventId,value.text)
     }
+    taskDispatcher?.rememberReport(provider, value)
     if (provider === 'codex' ? !announceCodex : !announceWorkbuddy) return
     notifications.receive({ eventId: value.eventId || `${provider}:${value.id}:${Date.now()}`, sentAt: Date.now(),
       reportTaskId: provider === 'codex' ? value.id : undefined, reportTurnId: provider === 'codex' ? value.turnId : undefined,
@@ -1118,6 +1126,7 @@ async function start() {
     workspaceRoots:[path.join(app.getPath('documents'),'AIBanlv Workspace'),path.join(os.homedir(),'kaifa'),
       ...(!app.isPackaged ? [path.resolve(directory,'../../..')] : [])],
     context: roleContext,
+    remoteStatuses: () => aiTools?.snapshot().items || [], beforeRemoteSend: beforeModelSend,
     onCompleted:(provider,value)=>{if(value.scope)taskReports?.add(provider,value,value.scope)},
     onActivity: value => activity.add(value.source, value.kind, value.text, value.key) })
   assistant.taskRouter = taskDispatcher
@@ -1181,6 +1190,8 @@ async function start() {
   })
   channel.on('state', state => { if (state.binding === 'bound') remoteReplies.retry() })
   channel.on('revoked', () => {
+    taskDispatcher?.clearReports()
+    taskDispatcher?.remote.clear()
     pluginOwner = ''
     void taskReports.clear()
     remoteReplies.clear(); notifications.clear()
@@ -1190,7 +1201,7 @@ async function start() {
     }
   })
   channel.on('text', (value, requestId, metadata) => { if (!localMode()) remoteReplies.submit(value, requestId, metadata || {}) })
-  channel.on('history', (agentId, requestId) => remoteReplies.replay(agentId, requestId))
+  channel.on('history', (agentId, requestId, options) => remoteReplies.replay(agentId, requestId, options))
   runtime.on('state', () => {
     void conversationStore.setScope(storageScope()).catch(storageFailure)
     publish(); void refreshScore()
@@ -1233,7 +1244,7 @@ app.on('before-quit', event => {
   })
 })
 start().catch(error => {
-  console.error('[device]', error.code || error.name)
+  console.error('[device]', error.code || error.name, redact(error))
   dialog.showErrorBox('Control 设备启动失败', '无法读取设备配置或启动设备服务，请检查资源与配置。')
   app.quit()
 })

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { bindingCode } from './device-binding-code.mjs'
+import { remoteToolIds } from './device-remote-tools.mjs'
 
 export const DEFAULT_CONTROL_ENDPOINT = 'wss://scrm.ieasysell.com/ws/control/desktop'
 
@@ -239,14 +240,21 @@ export class DeviceChannel extends EventEmitter {
     } else if (type === 'send_text' && this.state.binding === 'bound') {
       // A controller that just reconnected asks for the visible transcript
       // instead of starting a turn, so it must never reach the pet's mouth.
-      if (message.operation === 'sync_history') {
-        this.emit('history', text(message.agentId), text(message.requestId))
+      if (message.operation === 'sync_history' || message.operation === 'sync_tools') {
+        this.emit('history', text(message.agentId), text(message.requestId),
+          ...(message.operation === 'sync_tools' ? [{ toolsOnly: true }] : []))
+        return
+      }
+      if (message.remoteTarget !== undefined && !remoteToolIds.includes(message.remoteTarget)) {
+        this.send({ type: 'error', deviceId: this.state.deviceId, requestId: text(message.requestId),
+          code: 'INVALID_TOOL', message: '工具目标无效，消息未发送。' })
         return
       }
       const value = text(message.text, 1000)
       if (value) this.emit('text', value, text(message.requestId), {
         agentId: text(message.agentId), websocketSessionId: text(message.websocketSessionId),
         historyUserMessageId: text(message.historyUserMessageId), originSessionId: text(message.originSessionId, 128),
+        ...(message.remoteTarget ? { remoteTarget: message.remoteTarget } : {}),
         computerAuthorized: message.computerAuthorized === true && this.state.directTransferSupported && (!this.state.proofRequired || this.state.accountAuthReady) })
     } else if (type === 'transfer_signal' && this.state.binding === 'bound' && this.state.directTransferSupported &&
         message.deviceId === this.state.deviceId && message.controllerUserId === this.state.owner && message.tenantId === this.tenantId) {

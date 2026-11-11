@@ -5,8 +5,8 @@
 // last message of a turn is retried until its `reply_saved` receipt arrives or
 // the binding changes. See ControlReplyHistory in live-broadcast-java.
 export class DeviceRemoteReplies {
-  constructor({ chat, context, send, intervalMs = 100, retryMs = 2000, now = Date.now, persist, onPersistError = () => {} }) {
-    Object.assign(this, { chat, context, send, intervalMs, retryMs, now, persist, onPersistError })
+  constructor({ chat, context, send, intervalMs = 100, retryMs = 2000, now = Date.now, persist, onPersistError = () => {}, tools }) {
+    Object.assign(this, { chat, context, send, intervalMs, retryMs, now, persist, onPersistError, tools })
     this.history = []
     this.outbox = new Map()
     this.requests = new Map()
@@ -86,17 +86,18 @@ export class DeviceRemoteReplies {
     if (index < 0) this.history.push(row); else this.history[index] = row
     this.history = this.history.slice(-40)
   }
-  replay(agentId, requestId) {
+  replay(agentId, requestId, { toolsOnly = false } = {}) {
     const context = this.scope()
     if (!context || context.agentId !== agentId) return
     if (this.historyScope && JSON.stringify(this.historyScope) !== JSON.stringify(context)) return
     // Empty history still acknowledges support, distinguishing a restarted
     // device from an old executable that cannot send conversation history.
     const scoped = JSON.stringify(this.historyScope) === JSON.stringify(context)
-    const history = scoped ? this.history.slice() : []
+    const history = !toolsOnly && scoped ? this.history.slice() : []
     while (history.length && Buffer.byteLength(JSON.stringify(history)) > 48000) history.shift()
     this.send({ type: 'assistant_reply', snapshot: true, protocolVersion: 2, requestId,
-      deviceId: context.deviceId, agentId, history })
+      deviceId: context.deviceId, agentId, history, ...(toolsOnly ? { toolsOnly: true } : {}),
+      ...(this.tools ? { remoteTools: this.tools() } : {}) })
   }
   error(context, requestId, result) {
     const payload = { type: 'error', deviceId: context.deviceId, requestId,
@@ -119,7 +120,7 @@ export class DeviceRemoteReplies {
     const key = this.requestKey(context, requestId)
     const previous = this.requests.get(key)
     if (requestId && previous) {
-      if (previous.text !== text) {
+      if (previous.text !== text || previous.target !== (metadata.remoteTarget || '')) {
         this.error(context, requestId, { code: 'INVALID_TEXT', message: '请重新发送消息' })
         return
       }
@@ -137,7 +138,7 @@ export class DeviceRemoteReplies {
       historyUserMessageId: metadata.historyUserMessageId || '' }
     this.pending = turn
     if (requestId) {
-      this.requests.set(key, { text, expiresAt: this.now() + 10 * 60000 })
+      this.requests.set(key, { text, target: metadata.remoteTarget || '', expiresAt: this.now() + 10 * 60000 })
       while (this.requests.size > 256) this.requests.delete(this.requests.keys().next().value)
     }
     try {

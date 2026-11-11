@@ -201,3 +201,32 @@ test('an interrupted turn still reports the partial reply it spoke', () => {
   assert.equal(sent.at(-1).text, '好的，我接着说')
   relay.clear()
 })
+
+test('a request ID cannot be replayed against a different tool', async () => {
+  let calls = 0
+  const { relay, sent } = fixture(() => { calls++; return { ok: false, code: 'FIXTURE' } })
+  await relay.submit('同一句话', 'target-replay', { remoteTarget: 'codex' })
+  await relay.submit('同一句话', 'target-replay', { remoteTarget: 'harness' })
+  assert.equal(calls, 1)
+  assert.equal(sent.at(-1).code, 'INVALID_TEXT')
+  relay.clear()
+})
+
+test('history capability snapshot adds safe tool readiness without starting a turn', () => {
+  const { relay, sent } = fixture(() => assert.fail('catalog must not start a model turn'))
+  relay.tools = () => ({ version: 1, defaultTarget: 'codex', items: [{ id: 'codex', available: true }] })
+  relay.replay('role', 'catalog')
+  assert.equal(sent.at(-1).remoteTools.version, 1)
+  assert.equal(sent.at(-1).remoteTools.items[0].id, 'codex')
+  relay.clear()
+})
+
+test('tools-only refresh does not replay conversation history', () => {
+  const { relay, sent } = fixture(() => assert.fail('readiness must not start a turn'))
+  relay.tools = () => ({ version: 1, items: [] })
+  relay.replay('role', 'tools', { toolsOnly: true })
+  assert.equal(sent.at(-1).toolsOnly, true)
+  assert.deepEqual(sent.at(-1).history, [])
+  assert.equal(sent.at(-1).remoteTools.version, 1)
+  relay.clear()
+})

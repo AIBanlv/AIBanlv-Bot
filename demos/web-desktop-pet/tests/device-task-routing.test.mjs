@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { directScreenshotTask, routingPrompt, validateTaskRoute } from '../electron/device-task-routing.mjs'
 import { AssistantService } from '../electron/device-assistant-service.mjs'
+import { HarnessTaskDispatcher } from '../electron/device-task-dispatcher.mjs'
 
 test('only single explicit screenshot operations bypass the semantic model', () => {
   for (const text of ['截图发我', '请帮我截个图发给绑定手机', '把刚才的截图发给我', '电脑截图', '截图发送到手机']) {
@@ -69,4 +70,39 @@ test('routing bounds JSON-escaped context without losing the latest request or r
   assert.throws(() => routingPrompt('字'.repeat(4001)), /INVALID_TASK_ROUTE/)
   assert.throws(() => routingPrompt('\ud800'.repeat(4000)), /INVALID_TASK_ROUTE/, 'JSON escaping alone cannot exceed the bounded transport')
   assert.throws(() => validateTaskRoute({ decision: 'task', provider: 'desktop', operation: 'create', task: '字'.repeat(2001) }), /INVALID_TASK_ROUTE/)
+})
+
+test('a single scoped report resolves continue without model inference and multiple reports clarify', async () => {
+  let scope = { bound: true, owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role' }
+  const tasks = new Map([['one', { id: 'one', title: '修复登录', status: 'completed', lastTurnId: 'turn-one' }]])
+  const router = new HarnessTaskDispatcher({ codex: { tasks }, context: () => scope })
+  assert.equal(router.continuationRoute('继续'), null, 'ordinary conversational continuation stays with the semantic router')
+  assert.equal(router.continuationRoute('让 Codex 继续').decision, 'clarify')
+  router.rememberReport('codex', { id: 'one', turnId: 'turn-one', scope })
+  const service = new AssistantService({ settings: { snapshot: () => ({ enabled: true }) }, root: 'fixture' })
+  service.taskRouter = router
+  service.planner = { run: async () => assert.fail('a single explicit continuation must not require inference') }
+  assert.deepEqual(await service.planTask('继续'), { decision: 'task', provider: 'codex', operation: 'continue', task: '继续', taskId: 'one' })
+  assert.equal(router.continuationRoute('不要继续'), null)
+  assert.equal(router.continuationRoute('“继续”是什么意思'), null)
+  assert.equal(router.continuationRoute('继续搜索邮件'), null)
+  tasks.set('two', { id: 'two', title: '检查支付', status: 'completed', lastTurnId: 'turn-two' })
+  router.rememberReport('codex', { id: 'two', turnId: 'turn-two', scope })
+  const ambiguous = await service.planTask('继续')
+  assert.equal(ambiguous.decision, 'clarify')
+  assert.match(ambiguous.message, /修复登录.*检查支付/)
+  scope = { ...scope, owner: 'replacement' }
+  assert.deepEqual(router.continuationTasks(), [])
+  scope = { ...scope, owner: 'owner' }
+  assert.deepEqual(router.continuationTasks(), [], 'returning to an earlier account must not revive report targets')
+})
+
+test('continuation tool routes are Codex-only and carry bounded reported task identities', () => {
+  const route = { decision: 'task', task: '继续修复剩余问题', provider: 'codex', operation: 'continue', taskId: 'known' }
+  assert.deepEqual(validateTaskRoute(route), route)
+  assert.equal(validateTaskRoute({ ...route, taskId: undefined }).operation, 'continue')
+  assert.throws(() => validateTaskRoute({ ...route, provider: 'workbuddy' }), /INVALID_TASK_ROUTE/)
+  const prompt = routingPrompt('继续修复剩余问题', [], [{ id: 'known', title: '原任务', status: 'completed' }])
+  assert.match(prompt, /known/)
+  assert.match(prompt, /continue/)
 })

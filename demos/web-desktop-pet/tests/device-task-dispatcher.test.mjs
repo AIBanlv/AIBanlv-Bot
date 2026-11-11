@@ -47,6 +47,16 @@ test('WorkBuddy rejects a runtime without advertised dontAsk support before subm
   assert.equal(worker.tasks.size, 0)
 })
 
+test('WorkBuddy does not start a delayed launch after its remote binding has changed', async () => {
+  let current = true
+  const worker = new WorkBuddyAgent({
+    launch: async () => { current = false; return { command: process.execPath, args: [fixture] } },
+    spawnProcess: () => assert.fail('a revoked binding must not start a task'),
+  })
+  await assert.rejects(worker.create('旧绑定任务', cwd, { isCurrent: () => current }), /绑定|上下文/)
+  assert.equal(worker.tasks.size, 0)
+})
+
 test('a clean process exit without a result is not task success, and errors never leak credentials', async t => {
   const worker = new WorkBuddyAgent({ launch: async () => ({ command: process.execPath, args: [fixture] }) })
   t.after(() => worker.shutdown())
@@ -162,4 +172,68 @@ test('Harness reviews its plan before a provider can create a task',async t=>{
   assert.equal(creates,0);decision='allow'
   await router.execute({provider:'codex',task:'planned task',workspace},{fromHarness:true})
   assert.equal(creates,1);assert.equal(reviews[0].request.originalTask,'original user task')
+})
+
+test('Harness continues only a reported task in the same binding and forwards cancellation/context checks', async () => {
+  let scope = { bound: true, owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role' }
+  const calls = [], task = { id: 'existing', title: '原任务', cwd, status: 'completed', lastTurnId: 'old' }
+  const codex = { tasks: new Map([[task.id, task]]), connect: async () => {},
+    continue: async (...args) => { calls.push(args); return { ok: true, taskId: task.id, turnId: 'next' } } }
+  const router = new HarnessTaskDispatcher({ assistant: {}, codex, context: () => scope })
+  router.rememberReport('codex', { id: task.id, turnId: 'old', scope })
+  const controller = new AbortController()
+  const result = await router.execute({ provider: 'codex', operation: 'continue', task: '继续' }, { signal: controller.signal })
+  assert.equal(result.taskId, task.id)
+  assert.equal(calls[0][0], task.id); assert.equal(calls[0][1], '继续')
+  assert.equal(calls[0][2].signal, controller.signal)
+  assert.equal(calls[0][2].isCurrent(), true)
+  scope = { ...scope, agentId: 'different-role' }
+  assert.equal(calls[0][2].isCurrent(), false)
+  await assert.rejects(router.execute({ provider: 'codex', operation: 'continue', task: '继续', taskId: task.id }), /任务/)
+  assert.equal(calls.length, 1)
+})
+
+test('Harness never guesses a task when multiple reports exist or accepts a forged task ID', async () => {
+  const scope = { bound: true, owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role' }
+  const tasks = new Map(['one', 'two'].map(id => [id, { id, title: id, status: 'completed', lastTurnId: id }]))
+  const codex = { tasks, connect: async () => {}, continue: async () => assert.fail('must not submit') }
+  const router = new HarnessTaskDispatcher({ assistant: {}, codex, context: () => scope })
+  for (const id of tasks.keys()) router.rememberReport('codex', { id, turnId: id, scope })
+  await assert.rejects(router.execute({ provider: 'codex', operation: 'continue', task: '继续' }), /多个/)
+  await assert.rejects(router.execute({ provider: 'codex', operation: 'continue', task: '继续', taskId: 'forged' }), /任务/)
+  router.clearReports()
+  assert.deepEqual(router.continuationTasks(), [])
+})
+
+test('an explicit status query restores the single continuation target after restart', async () => {
+  const scope = { bound: true, owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role' }
+  const task = { id: 'existing', title: '原任务', status: 'completed', lastTurnId: 'last-turn' }
+  const codex = { tasks: new Map([[task.id, task]]), connect: async () => {}, monitorProject: async () => {},
+    refresh: async () => ({ tasks: [task] }) }
+  const router = new HarnessTaskDispatcher({ assistant: {}, codex, context: () => scope })
+  assert.equal(router.continuationRoute('继续'), null)
+  await router.execute({ provider: 'codex', operation: 'status', taskId: task.id })
+  assert.equal(router.continuationRoute('继续').taskId, task.id)
+  assert.equal(router.continuationRoute('继续（来自安卓端仅测试）').taskId, task.id)
+  assert.equal(router.continuationRoute('继续（来自安卓端仅测试）').task, '继续（来自安卓端仅测试）')
+  for (const text of ['不要继续', '“继续”是什么意思', '继续讲故事', '继续聊天']) assert.equal(router.continuationRoute(text), null)
+})
+
+test('status binds current tasks without making historical completed tasks continuation candidates', async () => {
+  const scope = { bound: true, owner: 'owner', tenantId: 'tenant', deviceId: 'device', agentId: 'role' }
+  const tasks = new Map([
+    ['active', { id: 'active', title: '当前任务', status: 'inProgress', lastTurnId: 'live', updatedAt: 200 }],
+    ['history', { id: 'history', title: '历史任务', status: 'completed', lastTurnId: 'old', updatedAt: 100 }],
+  ])
+  const codex = { tasks, connect: async () => {}, monitorProject: async () => {}, refresh: async () => ({ tasks: [...tasks.values()] }) }
+  const router = new HarnessTaskDispatcher({ assistant: {}, codex, context: () => scope })
+  assert.equal(router.directRoute('查询 codex 任务').operation, 'status')
+  for (const text of ['不要查询 codex 任务', '“查询 codex 任务”是什么意思', '怎么查询 codex 任务', '继续讲故事']) assert.equal(router.directRoute(text), null)
+  await router.execute({ provider: 'codex', operation: 'status' })
+  assert.deepEqual(router.continuationTasks().map(task => task.id), ['active'])
+  tasks.set('second', { id: 'second', title: '另一个当前任务', status: 'inProgress', lastTurnId: 'second', updatedAt: 300 })
+  await router.execute({ provider: 'codex', operation: 'status' })
+  assert.equal(router.directRoute('继续').decision, 'clarify')
+  assert.match(router.directRoute('继续').message, /当前任务/)
+  assert.match(router.directRoute('继续').message, /另一个当前任务/)
 })

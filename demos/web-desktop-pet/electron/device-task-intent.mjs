@@ -1,12 +1,16 @@
 // High-confidence imperative fallback, not a claim to classify arbitrary speech.
 // Questions, quotations and negation stay with the conversational model.
+export function isCodexStatusCommand(text) {
+  return typeof text === 'string' && /^(?:(?:请|帮我|麻烦你)\s*)?(?:查询|查看|查一下|看看|列出)\s*codex\s*(?:当前|的|所有|全部|一下|\s)*(?:任务|进度|状态)(?:进度|状态|情况|吧|一下|\s)*[。.!！?？]*$/i.test(text.trim())
+}
+
 export function isComputerCommand(text) {
   if (typeof text !== 'string') return false
   const value = text.trim()
   if (!value || /^[“"'「『]/.test(value) || /^(怎么|如何|为什么|怎样|什么是|教我|你能不能解释|他说|她说|假如|如果)/.test(value) ||
       /(不要|不用|不必|别再|别给|别帮|先别|暂时不|取消刚才的要求|不需要)/.test(value) || /\b(don't|do not|how to|how do|what is|if i|he said)\b/i.test(value)) return false
   const command = value.replace(/^(?:(?:请|帮我|给我|替我|麻烦你|麻烦|你|现在|直接|能不能|可以|能|一下|把|将)\s*)+/, '')
-  return /^(打开|启动|运行|截屏|截图|截个图|截一张|拍一张屏幕|电脑截图|电脑截个图|电脑截屏|屏幕截图|搜索|查一下|查找|读取|查看.{0,10}(邮件|文件|任务|进度)|整理.{0,6}桌面|恢复.{0,6}桌面|发送|发.{0,12}(文件|邮件|图片|截图)|停止.{0,12}(任务|Codex|WorkBuddy)|让\s*(Codex|WorkBuddy)|用\s*(Codex|WorkBuddy))/i.test(command) ||
+  return isCodexStatusCommand(value) || /^(打开|启动|运行|截屏|截图|截个图|截一张|拍一张屏幕|电脑截图|电脑截个图|电脑截屏|屏幕截图|搜索|查一下|查找|读取|查看.{0,10}(邮件|文件|任务|进度)|整理.{0,6}桌面|恢复.{0,6}桌面|发送|发.{0,12}(文件|邮件|图片|截图)|停止.{0,12}(任务|Codex|WorkBuddy)|让\s*(Codex|WorkBuddy)|用\s*(Codex|WorkBuddy))/i.test(command) ||
     /^(?:请|帮我|把|将|给我|替我|麻烦你|你).{1,160}(?:发给我|发送给我|发我)/.test(value) ||
     /^.{1,120}(发给|发送到|发到).{0,12}(手机|邮箱)/.test(command) ||
     /^(open|launch|screenshot|capture (my |the )?screen|send (a |the |this )?(file|email)|search for)\b/i.test(command) ||
@@ -25,6 +29,10 @@ export function fileTaskKind(text) {
 }
 
 export function isReminderCommand(text) { return isComputerCommand(text) && /提醒|闹钟/.test(text) }
+
+export function remoteCodexInput(text, options) {
+  return options?.remoteCodex === true && !options.notificationEventId && !options.greeting && (Boolean(options.remoteTarget) || !fileTaskKind(text))
+}
 
 // Only server-authenticated mobile sessions can expose local tools. History and
 // ordinary companion chat remain compatible with old control clients.

@@ -60,16 +60,21 @@ export class WorkBuddyAgent extends EventEmitter {
     }
     this.publish()
   }
-  async create(prompt, cwd = this.cwd, { signal = new AbortController().signal, scope } = {}) {
+  async create(prompt, cwd = this.cwd, { signal = new AbortController().signal, scope, isCurrent = () => true } = {}) {
+    const check = () => {
+      signal.throwIfAborted()
+      if (!isCurrent()) throw new Error('远程绑定上下文已变化，WorkBuddy 任务未提交')
+    }
+    check()
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 6000) throw new Error('请输入 1-6000 字的 WorkBuddy 任务')
     if (!cwd || !path.isAbsolute(cwd) || !(await stat(cwd)).isDirectory()) throw new Error('请先在插件中心选择 WorkBuddy 任务项目文件夹')
     cwd = await realpath(cwd)
     if (this.running.size >= 4) throw new Error('WorkBuddy 已有 4 个任务在运行，请先等待或停止')
-    const launch = await this.launch(); signal.throwIfAborted()
+    const launch = await this.launch(); check()
     // The headless bridge cannot answer interactive approvals. Only the Host's
     // already-authorized tools may run; unsupported modes never fall back to auto.
     await checkPermissionMode(launch, cwd, signal)
-    signal.throwIfAborted()
+    check()
     if (this.running.size >= 4) throw new Error('WorkBuddy 已有 4 个任务在运行，请先等待或停止')
     const id = randomUUID(), task = { id, title: text(prompt.trim(), 100), scope, cwd, status: 'inProgress', result: '', records: [] }
     const child = this.spawnProcess(launch.command, [...launch.args, '--print', '--verbose', '--output-format', 'stream-json',
