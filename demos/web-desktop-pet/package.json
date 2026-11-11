@@ -2,7 +2,7 @@
   "name": "control-web-desktop-pet-demo",
   "private": true,
   "type": "module",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "main": "electron/main.mjs",
   "packageManager": "npm@10.9.2",
   "engines": {
