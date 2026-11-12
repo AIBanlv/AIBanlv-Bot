@@ -169,6 +169,19 @@ test('detached staged helper survives parent exit and launches the updated fixtu
   while (processAlive(JSON.parse(await readFile(config.receipt, 'utf8')).pid)) { assert.ok(Date.now() < deadline); await delay(80) }
 })
 
+test('worker entry recognizes an alias even when Node preserves the main module path', async t => {
+  const f = await sourceFixture(t); await f.publish()
+  const config = await configFor(f), stage = path.dirname(config.jobFile), alias = path.join(f.directory, 'worker-alias')
+  await symlink(stage, alias, 'junction')
+  for (const name of ['device-source-git.mjs', 'device-source-update-worker.mjs']) {
+    await copyFile(new URL(`../electron/${name}`, import.meta.url), path.join(stage, name))
+  }
+  await runSourceCommand(process.execPath, ['--preserve-symlinks-main', path.join(alias, 'device-source-update-worker.mjs'), config.jobFile],
+    { timeout: 15000 })
+  assert.equal(JSON.parse(await readFile(config.receipt, 'utf8')).status, 'done')
+  assert.equal(await readFile(path.join(f.root, 'app.txt'), 'utf8'), 'new')
+})
+
 test('stalled handoff marks cancellation so a late helper cannot apply code', async t => {
   const f = await sourceFixture(t); await f.publish()
   const config = await configFor(f)

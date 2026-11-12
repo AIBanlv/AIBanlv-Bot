@@ -19,7 +19,7 @@ async function fixture(t) {
 }
 test('Codex launch prefers complete npm native toolchain over an orphan executable in npm root', async t => {
   const f = await fixture(t)
-  assert.equal((await codexLaunch(f.options)).command, await realpath(path.join(f.bin, 'codex.exe')))
+  assert.equal(await realpath((await codexLaunch(f.options)).command), await realpath(path.join(f.bin, 'codex.exe')))
 })
 test('explicit Codex path is never silently replaced and missing code-mode helper is diagnosed before creating a task', async t => {
   const f = await fixture(t)

@@ -126,7 +126,7 @@ export async function runSourceWorker(config, { alive = processAlive, waitMs = 1
   } finally { await release() }
 }
 
-if (process.argv[1] && await realpath(process.argv[1]).catch(() => null) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && await realpath(process.argv[1]).catch(() => null) === await realpath(fileURLToPath(import.meta.url))) {
   const config = JSON.parse(await readFile(process.argv[2], 'utf8'))
   await runSourceWorker(config).catch(async () => {
     await writeSourceReceipt(config, 'error', '源码更新进程异常，未完成更新。').catch(() => {})
