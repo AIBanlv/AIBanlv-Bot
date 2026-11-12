@@ -94,6 +94,10 @@ async function run(script, data, signal, code) {
       // Reconciliation must run after the helper is gone, not just after its
       // abort callback, which can precede actual process termination.
       child.once('close', () => outcome?.error ? reject(outcome.error) : resolve(outcome?.output || ''))
+      // The helper reads only its environment; do not leave a redirected input
+      // pipe open on console-less Windows runners.
+      // https://nodejs.org/docs/latest-v24.x/api/child_process.html#subprocessstdin
+      child.stdin.end()
     })
     signal.throwIfAborted()
     return JSON.parse(stdout.replace(/^\uFEFF/, '').trim())

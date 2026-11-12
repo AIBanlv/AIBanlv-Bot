@@ -17,7 +17,8 @@ test('Windows source setup produces a usable shortcut and MCP config; cached plu
     await Promise.all(heldProcesses.map(({ exited }) => exited))
     await rm(directory, { recursive: true, force: true })
   })
-  const profile = path.join(directory, 'profile'), desktop = path.join(directory, 'desktop'), output = path.join(directory, 'config')
+  // A supplementary character exposes ANSI shortcut paths even on Chinese Windows.
+  const profile = path.join(directory, 'profile'), desktop = path.join(directory, 'desktop-\u{1d11e}'), output = path.join(directory, 'config')
   const local = path.join(directory, 'local'), tools = path.join(local, 'AIBanlv/tools')
   await mkdir(tools, { recursive: true })
   await writeFile(path.join(tools, 'source-node.json'), JSON.stringify({ node: process.execPath }))
@@ -36,7 +37,7 @@ test('Windows source setup produces a usable shortcut and MCP config; cached plu
   // the invocation casing; Windows paths compare case-insensitively.
   assert.equal(path.resolve(settings.root).toLowerCase(), path.resolve(root).toLowerCase())
   const inspect = path.join(directory, 'inspect.ps1')
-  await writeFile(inspect, 'param($Link)\n$s = (New-Object -ComObject WScript.Shell).CreateShortcut($Link)\n@{target=$s.TargetPath; arguments=$s.Arguments; icon=$s.IconLocation} | ConvertTo-Json\n')
+  await writeFile(inspect, 'param($Link)\n$s = (New-Object -ComObject Shell.Application).NameSpace((Split-Path $Link)).ParseName((Split-Path $Link -Leaf)).GetLink\n$icon = ""\n$index = $s.GetIconLocation([ref]$icon)\n@{target=$s.Path; arguments=$s.Arguments; icon="$icon,$index"} | ConvertTo-Json\n')
   const { stdout } = await execute('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', inspect,
     path.join(desktop, 'AIBanlv Source.lnk')], { windowsHide: true })
   const shortcut = JSON.parse(stdout)

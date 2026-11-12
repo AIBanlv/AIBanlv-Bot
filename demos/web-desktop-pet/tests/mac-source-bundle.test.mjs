@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, readdir, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { installMacSource, requireMacHost, verifyMacBundle, writeMacBundleManifest } from '../scripts/install-mac-source.mjs'
@@ -53,6 +53,10 @@ test('Mac installer rejects Intel, Rosetta and older macOS rather than claiming 
 
 test('failed target inference leaves settings unchanged, publishes no ready state and supports a successful retry', async t => {
   const f = await fixture(t), config = path.join(f.demo, 'runtime.local.json'), calls = []
+  const cache = f.cacheDirectory
+  await mkdir(cache)
+  f.cacheDirectory = path.join(f.root, 'cache-alias')
+  await symlink(cache, f.cacheDirectory, 'junction')
   await writeFile(config, '{"unrelated":"preserved"}')
   const run = async (...args) => { calls.push(args) }
   await assert.rejects(installMacSource({ ...f, run, verify: async () => { throw Error('native inference failed') } }), /native inference failed/)
@@ -62,7 +66,7 @@ test('failed target inference leaves settings unchanged, publishes no ready stat
   let checked = 0
   const result = await installMacSource({ ...f, run, verify: async directory => {
     checked++
-    assert.ok(directory.startsWith(f.cacheDirectory))
+    assert.equal(path.dirname(directory), await realpath(f.cacheDirectory))
     assert.ok((await readFile(path.join(directory, 'mac/model-manifest.json'), 'utf8')).length)
   } })
   assert.equal(checked, 1)

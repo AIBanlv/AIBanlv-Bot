@@ -24,5 +24,6 @@ jobs:
         with:
           node-version: '24.19.0'
       - run: npm ci
-      - run: npm run setup
+      # Unit tests use synthetic runtime fixtures, not downloaded models.
+      - run: npm run setup:deps
       - run: npm test

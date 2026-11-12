@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdtemp, mkdir, writeFile, readFile, copyFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, copyFile, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,11 +63,14 @@ test('Node download has a total body deadline and refuses incomplete payloads', 
 
 test('source updater uses the registered Node/npm without PATH and rejects tools inside the checkout', { skip: process.platform !== 'win32' }, async t => {
   const f = await fixture(t), local = path.join(f.directory, 'local'), tools = path.join(local, 'AIBanlv/tools')
+  const alias = path.join(f.directory, 'node-alias')
+  await symlink(path.dirname(f.node), alias, 'junction')
+  f.node = path.join(alias, 'node.exe')
   await mkdir(tools, { recursive: true })
   await writeFile(path.join(tools, 'source-node.json'), JSON.stringify({ node: f.node }))
   const env = { ...process.env, LOCALAPPDATA: local, PATH: path.join(process.env.SystemRoot, 'System32') }
   const selected = await sourceTools(root, env)
-  assert.equal(selected.node.toLowerCase(), f.node.toLowerCase())
-  assert.equal(selected.npm.toLowerCase(), path.join(path.dirname(f.node), 'node_modules/npm/bin/npm-cli.js').toLowerCase())
+  assert.equal(selected.node, await realpath(f.node))
+  assert.equal(selected.npm, await realpath(path.join(path.dirname(f.node), 'node_modules/npm/bin/npm-cli.js')))
   await assert.rejects(sourceTools(f.cache, env), { code: 'SOURCE_NODE' })
 })
