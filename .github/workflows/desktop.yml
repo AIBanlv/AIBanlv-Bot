@@ -12,14 +12,6 @@ on:
       - 'docs/image/**'
       - 'docs/video/**'
 jobs:
-  windows-diagnostics:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.19.0'
-      - run: node .github/scripts/diagnose-windows-helper.mjs
   unit:
     strategy:
       fail-fast: false

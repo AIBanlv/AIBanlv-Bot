@@ -78,7 +78,8 @@ async function run(script, data, signal, code) {
   signal.throwIfAborted()
   if (process.platform !== 'win32') throw failure('WINDOWS_REQUIRED')
   const env = {}
-  for (const key of ['SystemRoot', 'WINDIR', 'ComSpec', 'PATH', 'TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ProgramData']) {
+  // Preserve module discovery on Windows Server while excluding host startup hooks.
+  for (const key of ['SystemRoot', 'WINDIR', 'ComSpec', 'PATH', 'TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ProgramData', 'PSModulePath']) {
     if (process.env[key]) env[key] = process.env[key]
   }
   env.AIBANLV_ACTION_JSON = JSON.stringify(data)
