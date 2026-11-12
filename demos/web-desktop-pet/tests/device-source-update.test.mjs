@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { readFile, writeFile, mkdir, access, copyFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, access, copyFile, symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { sourceFixture } from './source-update-fixture.mjs'
@@ -151,9 +151,12 @@ test('source checking can be cancelled and handoff failure keeps the app open', 
 test('detached staged helper survives parent exit and launches the updated fixture', async t => {
   const f = await sourceFixture(t); await f.publish()
   const config = await configFor(f), marker = path.join(f.directory, 'restarted')
+  const temporary = path.join(f.directory, 'temporary'), alias = path.join(f.directory, 'temporary-alias')
+  await mkdir(temporary); await symlink(temporary, alias, 'junction')
   const parent = path.join(f.directory, 'parent.mjs')
   const module = new URL('../electron/device-source-update.mjs', import.meta.url).href
   await writeFile(parent, `import { prepareSourceHandoff } from ${JSON.stringify(module)};
+    process.env.TEMP = process.env.TMPDIR = ${JSON.stringify(alias)};
     await prepareSourceHandoff(${JSON.stringify({ plan: config.plan, directory: path.dirname(config.receipt), tools: { node: process.execPath, npm: 'unused' },
       executable: process.execPath, args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`] })});
     await new Promise(resolve => setTimeout(resolve, 200));`)

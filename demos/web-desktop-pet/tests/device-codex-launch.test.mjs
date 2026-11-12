@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { codexLaunch } from '../electron/device-codex.mjs'
@@ -19,7 +19,7 @@ async function fixture(t) {
 }
 test('Codex launch prefers complete npm native toolchain over an orphan executable in npm root', async t => {
   const f = await fixture(t)
-  assert.equal((await codexLaunch(f.options)).command, path.join(f.bin, 'codex.exe'))
+  assert.equal((await codexLaunch(f.options)).command, await realpath(path.join(f.bin, 'codex.exe')))
 })
 test('explicit Codex path is never silently replaced and missing code-mode helper is diagnosed before creating a task', async t => {
   const f = await fixture(t)

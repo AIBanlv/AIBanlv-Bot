@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { lstat } from 'node:fs/promises'
+import { chmod, lstat } from 'node:fs/promises'
 import path from 'node:path'
 import { appBuilderPath } from 'app-builder-bin'
 import { boundedFile, sha256 } from './device-update-io.mjs'
@@ -14,6 +14,12 @@ export async function createInstallerBlockmap(file) {
   const output = `${file}.blockmap`
   const before = await lstat(file)
   if (!before.isFile() || before.size <= 0 || before.size > 8 * 1024 ** 3) throw new Error('Invalid installer for blockmap')
+  if (process.platform !== 'win32') {
+    // The pinned npm package ships its Mac arm64 binary without execute bits.
+    const tool = await lstat(appBuilderPath)
+    if (!tool.isFile()) throw new Error('Use the pinned app-builder binary')
+    if (!(tool.mode & 0o100)) await chmod(appBuilderPath, (tool.mode & 0o777) | 0o111)
+  }
   await promisify(execFile)(appBuilderPath, ['blockmap', '--input', file, '--output', output],
     { shell: false, windowsHide: true, timeout: 10 * 60 * 1000, maxBuffer: 1024 * 1024 })
   const data = await boundedFile(output, MAX_BLOCKMAP_BYTES)

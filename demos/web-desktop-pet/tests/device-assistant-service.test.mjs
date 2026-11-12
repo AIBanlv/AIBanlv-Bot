@@ -75,7 +75,7 @@ test('broker authenticates, binds an active session, deduplicates and blocks lat
   // Stdio notification and loopback HTTP can arrive in either order.
   setTimeout(() => broker.permit('session-1', 'call-1', body.action), 20)
   const results = await Promise.all([send(), send()])
-  assert.deepEqual(results.map(r => r.status), [200, 409])
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409])
   assert.equal(executed.length, 1)
   assert.equal((await send({ ...body, callId: 'huge', extra: true })).status, 400)
   abort.abort()
