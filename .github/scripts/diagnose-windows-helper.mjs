@@ -25,11 +25,16 @@ $apps = @(Get-StartApps)
 [Console]::Error.WriteLine('apps')
 [Console]::Write('ready')
 `
-for (const [name, env] of Object.entries({ inherited: process.env, minimal, system,
-  modules: { ...minimal, PSModulePath: path.join(path.dirname(command), 'Modules') } })) {
+console.log(JSON.stringify({ executionPolicy: process.env.PSExecutionPolicyPreference,
+  architecture: process.env.PROCESSOR_ARCHITECTURE, systemDrive: process.env.SystemDrive }))
+for (const [name, env] of Object.entries({ policy: minimal,
+  architecture: { ...minimal, PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE, SystemDrive: process.env.SystemDrive },
+  inheritedModules: { ...minimal, PSModulePath: process.env.PSModulePath },
+  extended: { ...system, PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE, SystemDrive: process.env.SystemDrive,
+    HOME: process.env.HOME, PSModulePath: process.env.PSModulePath, PSExecutionPolicyPreference: process.env.PSExecutionPolicyPreference } })) {
   const start = Date.now()
   await new Promise(resolve => {
-    const child = execFile(command, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+    const child = execFile(command, ['-NoLogo', '-NoProfile', '-NonInteractive', ...(name === 'policy' ? ['-ExecutionPolicy', 'Bypass'] : []), '-EncodedCommand',
       Buffer.from(script, 'utf16le').toString('base64')], { env, windowsHide: true, timeout: 7000, maxBuffer: 16384 },
     (error, stdout, stderr) => {
       console.log(JSON.stringify({ name, milliseconds: Date.now() - start, code: error?.code,
